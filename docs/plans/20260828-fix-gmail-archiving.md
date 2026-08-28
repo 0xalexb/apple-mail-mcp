@@ -208,18 +208,18 @@ four combinations are legal and two of them need tests (see Task 4).
 - Modify: `src/apple_mail_mcp/config.py`
 - Modify: `tests/test_config.py`
 
-- [ ] add `_ALL_MAIL_LEAVES` and `is_all_mail(path)` beside `_TRASH_LEAVES` / `is_trash`, with a
+- [x] add `_ALL_MAIL_LEAVES` and `is_all_mail(path)` beside `_TRASH_LEAVES` / `is_trash`, with a
       why-comment: the label-less view containing every message, so a move into it is a
       self-move that silently does nothing
-- [ ] in `Config.require`, refuse `is_all_mail(path)` for **both** `move_to` and `move_from`,
+- [x] in `Config.require`, refuse `is_all_mail(path)` for **both** `move_to` and `move_from`,
       alongside the existing `is_trash` branch, with errors naming a real label as the fix
-- [ ] write tests for `is_all_mail`: matches `[Gmail]/All Mail`, `all mail`, mixed case and
+- [x] write tests for `is_all_mail`: matches `[Gmail]/All Mail`, `all mail`, mixed case and
       surrounding whitespace; does not match `Archive`, `Filed/All Mail Backups`
-- [ ] write test that `require(..., "move_to")` on an allowlisted All Mail path raises
-- [ ] write test that `require(..., "move_from")` on an allowlisted All Mail path raises
-- [ ] confirm `test_bracketed_gmail_names_are_literal` (`tests/test_config.py:134-140`) still
+- [x] write test that `require(..., "move_to")` on an allowlisted All Mail path raises
+- [x] write test that `require(..., "move_from")` on an allowlisted All Mail path raises
+- [x] confirm `test_bracketed_gmail_names_are_literal` (`tests/test_config.py:134-140`) still
       passes untouched — it is about glob syntax, not archiving
-- [ ] run `uv run pytest` — must pass before task 2
+- [x] run `uv run pytest` — must pass before task 2
 
 ### Task 2: Migrate the shared fixture off the broken archive target
 
