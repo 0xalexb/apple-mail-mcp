@@ -232,6 +232,28 @@ def test_archive_into_trash_is_refused(fake_runner):
     assert runner.scripts == []
 
 
+def test_archive_into_all_mail_is_refused(fake_runner):
+    from apple_mail_mcp.config import AccountConfig, Config, MailboxRule, Permissions
+
+    # Built by hand rather than through parse_config: parse_config now rejects an
+    # All Mail archive_mailbox outright, so routing through it would exercise the
+    # load-time guard and never reach the archive branch this test is about.
+    cfg = Config(
+        accounts=(
+            AccountConfig(
+                name="a",
+                account_id=None,
+                archive_mailbox="[Gmail]/All Mail",
+                mailboxes=(MailboxRule("INBOX", Permissions(move_from=True)),),
+            ),
+        )
+    )
+    svc, runner = service(cfg, fake_runner)
+    with pytest.raises(ValueError, match="the move would be a no-op"):
+        svc.archive_message("a/INBOX#1")
+    assert runner.scripts == []
+
+
 # -- tool layer ------------------------------------------------------------
 
 

@@ -251,19 +251,19 @@ four combinations are legal and two of them need tests (see Task 4).
 - Modify: `tests/test_config.py`
 - Modify: `tests/test_tools_write.py`
 
-- [ ] in `_account`, raise `ValueError` when `archive_mailbox` is `is_all_mail`, with the message:
+- [x] in `_account`, raise `ValueError` when `archive_mailbox` is `is_all_mail`, with the message:
       Gmail archives by moving to a real label such as 'Archive'; '[Gmail]/All Mail' is not a
       folder and the move silently does nothing
-- [ ] give the archive-branch guard a **different** error string from the load-time one, sharing
+- [x] give the archive-branch guard a **different** error string from the load-time one, sharing
       no matchable substring — otherwise no test can prove which of the two layers fired
-- [ ] add an `is_all_mail(target_mailbox)` refusal beside the existing `is_trash` check at
+- [x] add an `is_all_mail(target_mailbox)` refusal beside the existing `is_trash` check at
       `mail_service.py:296`, matching how Trash is guarded in both layers — `archive_message`
       never goes through `require`, so a config not built by `parse_config` would otherwise
       archive to All Mail unchecked
-- [ ] write test that `parse_config` raises on `archive_mailbox: "[Gmail]/All Mail"`, asserting
+- [x] write test that `parse_config` raises on `archive_mailbox: "[Gmail]/All Mail"`, asserting
       the error names the fix
-- [ ] write test that a config with `archive_mailbox: "Archive"` still parses
-- [ ] write test that the `_move` archive branch refuses an All Mail target — construct the
+- [x] write test that a config with `archive_mailbox: "Archive"` still parses
+- [x] write test that the `_move` archive branch refuses an All Mail target — construct the
       frozen dataclasses **directly**, bypassing `parse_config`:
       `Config(accounts=(AccountConfig(name="a", account_id=None, archive_mailbox="[Gmail]/All Mail",
       mailboxes=(MailboxRule("INBOX", Permissions(move_from=True)),)),))`.
@@ -272,8 +272,8 @@ four combinations are legal and two of them need tests (see Task 4).
       checkbox, so the test would die in config parsing, never reach `archive_message`, and still
       go green on a shared error substring — proving nothing about the guard whose whole
       justification is configs that bypass `parse_config`
-- [ ] assert that test matches the archive-branch error specifically, not the load-time one
-- [ ] run `uv run pytest` — must pass before task 4
+- [x] assert that test matches the archive-branch error specifically, not the load-time one
+- [x] run `uv run pytest` — must pass before task 4
 
 ### Task 4: Verify the message left the source mailbox
 
