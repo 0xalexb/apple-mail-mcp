@@ -42,14 +42,21 @@ There is no delete tool and no code path sets `deleted status`. Trash and Junk m
 refused as move targets even when allowlisted, and as an `archive_mailbox` at config load.
 `test_tools_write.py` asserts all of this; keep those tests passing.
 
-## All Mail is not refused
+## Gmail archiving is impossible, not merely broken
 
-Moving to `[Gmail]/All Mail` can be a no-op, but Apple Mail designates it as the Archive
-Mailbox for Gmail accounts and many have no other, so refusing it statically left
-`archive_message` unusable and — when the refusal ran at config load — took the whole read
-path down with it. The no-op is reported through `verified` instead. Only Trash and Junk are
-refused. `list_mailboxes` masks capabilities `require` refuses rather than advertising a
-permission that throws.
+AppleScript's `move` does not clear Gmail's INBOX label — a Mail bug, not ours. Mail removes
+the message locally and the server restores it under a new id, so it never leaves the INBOX.
+Proven on a live account: two `archive_message` calls returned success and both messages were
+still there under the new ids the calls had returned.
+
+A source-side count taken in the same round trip reads zero and so reports a false success.
+`_move` therefore counts twice, `SETTLE_SECONDS` apart, and `verified` requires both to be
+zero. Do not remove the second check or the delay.
+
+The documented workarounds are a Trash round-trip (violates the no-deletion guarantee) and GUI
+scripting (rejected: needs Accessibility, steals focus, breaks on menu renames). Neither is
+implemented. Only Trash and Junk are refused as targets; All Mail is attempted and reported on
+honestly.
 
 ## AppleScript traps
 

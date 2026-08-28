@@ -21,6 +21,12 @@ FLAG_COLORS = (
 
 MAX_BODY_CHARS = 20000
 
+# Mail removes a Gmail message from the INBOX locally and the server puts it back
+# moments later, so a count taken in the same breath as the move reads zero for a
+# move that did not stick. The second look, after this many seconds, is what makes
+# `verified` mean anything on Gmail.
+SETTLE_SECONDS = 3
+
 # Mail reports every mailbox with class `container`; an account reports a
 # subclass such as `imap account`, so `is account` is false and cannot be used.
 _PRELUDE = """
@@ -335,18 +341,24 @@ tell application "Mail"
 	try
 		set newId to "" & (id of (first message of target whose message id is rfc))
 	end try
-	return "" & rfc & "{US}" & newId & "{US}" & stillThere
+	delay {SETTLE_SECONDS}
+	set cameBack to -1
+	try
+		set cameBack to (count of (messages of mb whose message id is rfc))
+	end try
+	return "" & rfc & "{US}" & newId & "{US}" & stillThere & "{US}" & cameBack
 end tell
 """
         fields = self._run(script).split(US)
         # Stricter than read_message, whose last field is a body that may itself
-        # contain the separator. This payload is three fixed fields, so a fourth
+        # contain the separator. This payload is four fixed fields, so a fifth
         # means the framing is wrong.
-        if len(fields) != 3:
+        if len(fields) != 4:
             raise RuntimeError(f"Unexpected response moving {handle}")
         rfc, new_id = fields[0], fields[1].strip()
         still_there = _as_count(fields[2])
-        verified = still_there == 0
+        came_back = _as_count(fields[3])
+        verified = still_there == 0 and came_back == 0
 
         result = {
             "handle": (
@@ -367,7 +379,7 @@ end tell
                 "in the target yet, most likely because the account is still "
                 "syncing. Find it again with list_messages."
             )
-        warning = _move_warning(mailbox, still_there)
+        warning = _move_warning(mailbox, still_there, came_back)
         if warning:
             result["warning"] = warning
         return result
@@ -421,11 +433,21 @@ def _as_count(value: str) -> int:
         return -1
 
 
-def _move_warning(source_mailbox: str, still_there: int) -> str | None:
-    if still_there < 0:
+def _move_warning(
+    source_mailbox: str, still_there: int, came_back: int
+) -> str | None:
+    if still_there < 0 or came_back < 0:
         return (
             f"Mail did not report whether the message left '{source_mailbox}', so the "
             "move is unconfirmed. Check with list_messages before retrying."
+        )
+    if still_there == 0 and came_back > 0:
+        return (
+            f"The message left '{source_mailbox}' and then returned to it. This is the "
+            "Apple Mail bug that makes Gmail archiving impossible from AppleScript: "
+            "`move` removes the message locally but does not clear Gmail's INBOX "
+            "label, so the server restores it under a new id. Nothing was archived, "
+            "and retrying will not help."
         )
     if still_there > 0:
         return (

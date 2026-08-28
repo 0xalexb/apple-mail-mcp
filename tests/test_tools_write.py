@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from apple_mail_mcp.applescript import US
-from apple_mail_mcp.mail_service import MailService
+from apple_mail_mcp.mail_service import SETTLE_SECONDS, MailService
 
 
 def service(config, runner_cls, *responses):
@@ -88,7 +88,7 @@ def test_invalid_flag_color_is_rejected(config, fake_runner):
 
 def test_move_returns_the_reassigned_handle(config, fake_runner):
     """Mail gives the message a new integer id in its new mailbox."""
-    svc, runner = service(config, fake_runner, f"<abc@example.com>{US}127638{US}0")
+    svc, runner = service(config, fake_runner, f"<abc@example.com>{US}127638{US}0{US}0")
     result = svc.move_message("gmail/INBOX#127614", "Filed/Insurance")
 
     assert result["handle"] == "gmail/Filed/Insurance#127638"
@@ -100,7 +100,7 @@ def test_move_returns_the_reassigned_handle(config, fake_runner):
 
 
 def test_move_reports_when_the_message_cannot_be_relocated(config, fake_runner):
-    svc, _ = service(config, fake_runner, f"<abc@example.com>{US}{US}0")
+    svc, _ = service(config, fake_runner, f"<abc@example.com>{US}{US}0{US}0")
     result = svc.move_message("gmail/INBOX#127614", "Filed/x")
     assert result["handle"] is None
     assert "still syncing" in result["note"]
@@ -110,7 +110,7 @@ def test_move_reports_when_the_message_cannot_be_relocated(config, fake_runner):
 def test_move_is_verified_when_the_source_no_longer_holds_the_message(
     config, fake_runner
 ):
-    svc, runner = service(config, fake_runner, f"<a@b>{US}9{US}0")
+    svc, runner = service(config, fake_runner, f"<a@b>{US}9{US}0{US}0")
     result = svc.move_message("gmail/INBOX#1", "Filed/x")
     assert result["verified"] is True
     assert "warning" not in result
@@ -118,7 +118,7 @@ def test_move_is_verified_when_the_source_no_longer_holds_the_message(
 
 
 def test_move_is_unverified_when_the_message_stays_in_the_source(config, fake_runner):
-    svc, _ = service(config, fake_runner, f"<a@b>{US}9{US}1")
+    svc, _ = service(config, fake_runner, f"<a@b>{US}9{US}1{US}1")
     result = svc.move_message("gmail/INBOX#1", "Filed/x")
     assert result["verified"] is False
     assert "INBOX" in result["warning"]
@@ -126,7 +126,7 @@ def test_move_is_unverified_when_the_message_stays_in_the_source(config, fake_ru
 
 
 def test_move_can_be_unverified_and_missing_from_the_target(config, fake_runner):
-    svc, _ = service(config, fake_runner, f"<a@b>{US}{US}1")
+    svc, _ = service(config, fake_runner, f"<a@b>{US}{US}1{US}1")
     result = svc.move_message("gmail/INBOX#1", "Filed/x")
     assert result["handle"] is None
     assert "still syncing" in result["note"]
@@ -134,7 +134,26 @@ def test_move_can_be_unverified_and_missing_from_the_target(config, fake_runner)
     assert "INBOX" in result["warning"]
 
 
-@pytest.mark.parametrize("payload", [f"<a@b>{US}9", f"<a@b>{US}9{US}0{US}extra"])
+def test_a_move_that_returns_to_the_source_is_not_verified(config, fake_runner):
+    """The Gmail archiving bug: gone at move time, back a moment later."""
+    svc, _ = service(config, fake_runner, f"<a@b>{US}9{US}0{US}1")
+    result = svc.move_message("gmail/INBOX#1", "Filed/x")
+
+    assert result["verified"] is False
+    assert "returned to it" in result["warning"]
+    assert "retrying will not help" in result["warning"]
+
+
+def test_the_script_rechecks_the_source_after_a_settle(config, fake_runner):
+    svc, runner = service(config, fake_runner, f"<a@b>{US}9{US}0{US}0")
+    svc.move_message("gmail/INBOX#1", "Filed/x")
+
+    after_move = runner.script.split("move m to target", 1)[1]
+    assert after_move.count("count of (messages of mb whose message id is rfc)") == 2
+    assert f"delay {SETTLE_SECONDS}" in after_move
+
+
+@pytest.mark.parametrize("payload", [f"<a@b>{US}9{US}0", f"<a@b>{US}9{US}0{US}0{US}extra"])
 def test_move_raises_on_a_malformed_payload(config, fake_runner, payload):
     svc, _ = service(config, fake_runner, payload)
     with pytest.raises(RuntimeError, match="Unexpected response moving"):
@@ -143,14 +162,14 @@ def test_move_raises_on_a_malformed_payload(config, fake_runner, payload):
 
 @pytest.mark.parametrize("count", ["", "   ", "not a number"])
 def test_a_missing_source_count_is_never_read_as_success(config, fake_runner, count):
-    svc, _ = service(config, fake_runner, f"<a@b>{US}9{US}{count}")
+    svc, _ = service(config, fake_runner, f"<a@b>{US}9{US}{count}{US}{count}")
     result = svc.move_message("gmail/INBOX#1", "Filed/x")
     assert result["verified"] is False
     assert "did not report whether the message left 'INBOX'" in result["warning"]
 
 
 def test_nothing_after_the_move_can_abort_the_script(config, fake_runner):
-    svc, runner = service(config, fake_runner, f"<a@b>{US}9{US}0")
+    svc, runner = service(config, fake_runner, f"<a@b>{US}9{US}0{US}0")
     svc.move_message("gmail/INBOX#1", "Filed/x")
     lines = [line.strip() for line in runner.script.splitlines()]
     body = lines[lines.index("move m to target") :]
@@ -183,7 +202,7 @@ def test_move_to_unlisted_target_is_denied(config, fake_runner):
 
 
 def test_move_across_accounts(config, fake_runner):
-    svc, runner = service(config, fake_runner, f"<a@b>{US}9{US}0")
+    svc, runner = service(config, fake_runner, f"<a@b>{US}9{US}0{US}0")
     result = svc.move_message("gmail/INBOX#5", "Archive", target_account="iCloud")
     assert result["handle"] == "iCloud/Archive#9"
     assert 'account "iCloud"' in runner.script
@@ -208,7 +227,7 @@ def test_no_delete_tool_is_exposed():
 
 
 def test_service_never_emits_a_delete_command(config, fake_runner):
-    svc, runner = service(config, fake_runner, "ok", "ok", f"<a@b>{US}2{US}0")
+    svc, runner = service(config, fake_runner, "ok", "ok", f"<a@b>{US}2{US}0{US}0")
     svc.set_read_status("gmail/INBOX#1", read=True)
     svc.set_flag("gmail/INBOX#1", "red")
     svc.move_message("gmail/INBOX#1", "Filed/x")
@@ -222,7 +241,7 @@ def test_service_never_emits_a_delete_command(config, fake_runner):
 
 
 def test_archive_moves_to_the_configured_mailbox(config, fake_runner):
-    svc, runner = service(config, fake_runner, f"<a@b>{US}200{US}0")
+    svc, runner = service(config, fake_runner, f"<a@b>{US}200{US}0{US}0")
     result = svc.archive_message("gmail/INBOX#127614")
 
     assert result["handle"] == "gmail/Archive#200"
@@ -232,7 +251,7 @@ def test_archive_moves_to_the_configured_mailbox(config, fake_runner):
 
 def test_archive_target_need_not_carry_move_to(config, fake_runner):
     """iCloud's Archive is the account's declared archive; move_to is implied."""
-    svc, _ = service(config, fake_runner, f"<a@b>{US}3{US}0")
+    svc, _ = service(config, fake_runner, f"<a@b>{US}3{US}0{US}0")
     assert svc.archive_message("iCloud/INBOX#1")["handle"] == "iCloud/Archive#3"
 
 
@@ -268,7 +287,7 @@ def test_archiving_an_archived_message_is_rejected(config, fake_runner):
 
 
 def test_archive_reports_an_unverified_archive_as_unverified(config, fake_runner):
-    svc, _ = service(config, fake_runner, f"<a@b>{US}200{US}1")
+    svc, _ = service(config, fake_runner, f"<a@b>{US}200{US}1{US}1")
     result = svc.archive_message("gmail/INBOX#127614")
 
     assert result["verified"] is False
