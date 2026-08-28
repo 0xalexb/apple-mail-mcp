@@ -24,7 +24,8 @@ are separated from the domain ones. `applescript.py` is the seam tests fake.
 - Python 3.11+, type hints via `from __future__ import annotations`
 - Permissions: `read`, `mark_read`, `flag`, `move_from`, `move_to`; first matching rule wins
 - Handles are `account/mailbox/path#id`; ids are reassigned on move, so mutations re-find the
-  message by RFC Message-ID and return the new handle
+  message by RFC Message-ID and return the new handle. Arrival is only half of it: a move also
+  counts the message in the *source* afterwards and reports `verified`
 - Flag index: 0-6 = red, orange, yellow, green, blue, purple, gray; -1 = unflagged
 - AppleScript payloads are framed with `\x1f` (fields) and `\x1e` (records)
 
@@ -37,20 +38,30 @@ are separated from the domain ones. `applescript.py` is the seam tests fake.
 ## Deletion is out of scope
 
 There is no delete tool and no code path sets `deleted status`. Trash and Junk mailboxes are
-refused as move targets even when allowlisted. `test_tools_write.py` asserts all of this;
-keep those tests passing.
+refused as move targets even when allowlisted, and as an `archive_mailbox` at config load.
+`test_tools_write.py` asserts all of this; keep those tests passing.
 
 ## All Mail is refused
 
-`[Gmail]/All Mail` is Gmail's label-less view, not a mailbox: it is refused as a move source and
-as a move target even when allowlisted, and as an `archive_mailbox` at config load.
-`test_config.py` and `test_tools_write.py` assert this; keep those tests passing.
+Any mailbox whose leaf name is `all mail` (case- and whitespace-insensitive, any account) is
+Gmail's label-less view, not a mailbox: it is refused as a move source and as a move target even
+when allowlisted, and as an `archive_mailbox` at config load. Localized names slip past the leaf
+test and are caught only at runtime by `verified`. `list_mailboxes` masks the capabilities these
+guards refuse rather than advertising a permission that throws. `test_config.py` and
+`test_tools_write.py` assert this; keep those tests passing.
 
 ## AppleScript traps
 
 See the "Notes on Apple Mail" section of README.md before touching `mail_service.py`. The
-two that will silently cost you: iterating `messages of mb` directly is 25x slower, and `&`
-returns a list unless the left operand is text.
+ones that will silently cost you: iterating `messages of mb` directly is 25x slower, `&`
+returns a list unless the left operand is text, and moving to `[Gmail]/All Mail` no-ops while
+reporting success.
+
+Nothing in `_move`'s script may abort after `move m to target`. `OsascriptRunner` retries the
+whole script on `-600`, so a post-move failure re-runs the move; and an aborted script means a
+mutation that happened is reported as an error. Hence the source-side count sits in its own
+`try` with `stillThere` pre-set to `-1` beforehand, so the variable is defined at the `return`
+either way. A `-1` reaches the caller as `verified: false`, never as success.
 
 ## Distribution
 

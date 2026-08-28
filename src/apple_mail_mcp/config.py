@@ -131,6 +131,20 @@ def matches(path: str, pattern: str) -> bool:
     return re.fullmatch(escaped, path) is not None
 
 
+def advertised_permissions(path: str, permissions: Permissions) -> Permissions:
+    """Capabilities a caller can actually use, for reporting rather than enforcing.
+
+    A rule may grant move_to on Trash or either move on All Mail; `require` refuses
+    both regardless. Reporting the raw grant hands an agent a capability that throws
+    on first use.
+    """
+    if is_all_mail(path):
+        return replace(permissions, move_from=False, move_to=False)
+    if is_trash(path):
+        return replace(permissions, move_to=False)
+    return permissions
+
+
 def is_trash(path: str) -> bool:
     return path.rsplit("/", 1)[-1].strip().lower() in _TRASH_LEAVES
 
@@ -205,6 +219,11 @@ def _account(entry: dict, defaults: Permissions) -> AccountConfig:
             f"Account '{name}' sets archive_mailbox to '{archive_mailbox}'. Gmail "
             f"archives by moving to a real label such as 'Archive'; "
             f"'{archive_mailbox}' is not a folder and the move silently does nothing."
+        )
+    if archive_mailbox and is_trash(str(archive_mailbox)):
+        raise ValueError(
+            f"Account '{name}' sets archive_mailbox to '{archive_mailbox}'. "
+            f"Archiving is not deletion; name a real mailbox such as 'Archive'."
         )
 
     return AccountConfig(

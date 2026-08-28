@@ -46,9 +46,20 @@ def test_list_mailboxes_hides_mailboxes_outside_the_allowlist(config, fake_runne
     assert ("iCloud", "private/diary") not in paths
 
 
-def test_list_mailboxes_hides_all_mail(config, fake_runner):
-    svc, _ = service(config, fake_runner, f"[Gmail]/All Mail{US}0{RS}", "")
-    assert svc.list_mailboxes() == []
+def test_list_mailboxes_reports_the_archive_and_usable_permissions(
+    config, fake_runner
+):
+    gmail = f"INBOX{US}3{RS}[Gmail]/Trash{US}0{RS}"
+    icloud = f"Archive{US}0{RS}"
+    svc, _ = service(config, fake_runner, gmail, icloud)
+    rows = {(row["account"], row["mailbox"]): row for row in svc.list_mailboxes()}
+
+    assert rows[("iCloud", "Archive")]["is_archive"] is True
+    assert rows[("gmail", "INBOX")]["is_archive"] is False
+    assert rows[("gmail", "INBOX")]["permissions"]["move_from"] is True
+    # The fixture grants move_to on Trash; a refused capability must not be
+    # advertised as available.
+    assert rows[("gmail", "[Gmail]/Trash")]["permissions"]["move_to"] is False
 
 
 def test_list_messages_parses_records(config, fake_runner):

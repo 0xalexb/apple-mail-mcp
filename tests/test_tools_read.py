@@ -94,8 +94,11 @@ def test_every_tool_has_a_docstring():
 
 
 def test_move_tools_document_verified():
+    """The docstring is all a calling agent reads before deciding the move worked."""
     for tool in (server.move_message, server.archive_message):
-        assert "verified" in tool.__doc__, (
-            f"{tool.__name__} must document the verified key: it is all a calling "
-            "agent reads before deciding the move worked"
-        )
+        assert "verified: true only when the message is confirmed gone" in tool.__doc__
+        assert "comes with a warning" in tool.__doc__
+    assert (
+        "Do not report an unverified result as archived"
+        in server.archive_message.__doc__
+    )
