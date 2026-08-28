@@ -228,20 +228,20 @@ four combinations are legal and two of them need tests (see Task 4).
 - Modify: `tests/test_tools_write.py`
 - Modify: `tests/test_mail_service.py`
 
-- [ ] change `tests/conftest.py:38` gmail `archive_mailbox` from `"[Gmail]/All Mail"` to
+- [x] change `tests/conftest.py:38` gmail `archive_mailbox` from `"[Gmail]/All Mail"` to
       `"Archive"` (required: Task 3's guard would otherwise raise in every test using the fixture)
-- [ ] do **not** add an `Archive` mailbox entry to the gmail fixture — archive targets bypass the
+- [x] do **not** add an `Archive` mailbox entry to the gmail fixture — archive targets bypass the
       allowlist by design (`mail_service.py:295` uses `account()`, not `require()`), and
       `test_archive_target_need_not_carry_move_to` (`tests/test_tools_write.py:178-181`) pins
       that behaviour
-- [ ] update `test_archive_moves_to_the_configured_mailbox`: expected handle becomes
+- [x] update `test_archive_moves_to_the_configured_mailbox`: expected handle becomes
       `gmail/Archive#200`, script assertion becomes `mailbox "Archive"`
-- [ ] fix the now-stale comment and name at `tests/test_mail_service.py:49-52` — "despite being
+- [x] fix the now-stale comment and name at `tests/test_mail_service.py:49-52` — "despite being
       the archive target" stops being true once gmail's archive is `Archive`; the assertion
       itself (`== []`, All Mail is not allowlisted) still holds
-- [ ] run `grep -rn 'All Mail' tests/` and confirm the remaining hits are glob-syntax tests, not
+- [x] run `grep -rn 'All Mail' tests/` and confirm the remaining hits are glob-syntax tests, not
       fixture dependencies
-- [ ] run `uv run pytest` — must pass before task 3
+- [x] run `uv run pytest` — must pass before task 3
 
 ### Task 3: Reject an All Mail `archive_mailbox` at config load and in the archive branch
 
