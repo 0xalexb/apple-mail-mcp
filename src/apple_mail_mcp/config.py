@@ -18,6 +18,11 @@ _TRASH_LEAVES = frozenset(
     {"trash", "deleted messages", "deleted items", "bin", "junk"}
 )
 
+# Never a move source or target. Gmail's All Mail is not a folder but the
+# label-less view of every message, inbox included, so a move into it is a
+# self-move that silently does nothing, and nothing ever leaves it.
+_ALL_MAIL_LEAVES = frozenset({"all mail"})
+
 
 @dataclass(frozen=True)
 class Permissions:
@@ -98,6 +103,18 @@ class Config:
             raise ValueError(
                 f"Refusing to move messages into '{path}'. This server does not delete mail."
             )
+        if capability == "move_to" and is_all_mail(path):
+            raise ValueError(
+                f"Refusing to move messages into '{path}'. It is the label-less view of "
+                f"every message, not a folder, so the move does nothing. "
+                f"Use a real label such as 'Archive'."
+            )
+        if capability == "move_from" and is_all_mail(path):
+            raise ValueError(
+                f"Refusing to move messages out of '{path}'. It is the label-less view of "
+                f"every message, so a message never leaves it. "
+                f"Move from a real label such as 'INBOX' instead."
+            )
         return account
 
 
@@ -116,6 +133,10 @@ def matches(path: str, pattern: str) -> bool:
 
 def is_trash(path: str) -> bool:
     return path.rsplit("/", 1)[-1].strip().lower() in _TRASH_LEAVES
+
+
+def is_all_mail(path: str) -> bool:
+    return path.rsplit("/", 1)[-1].strip().lower() in _ALL_MAIL_LEAVES
 
 
 def _as_literal(value: str) -> str:

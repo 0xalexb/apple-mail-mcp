@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from apple_mail_mcp.config import is_trash, load_config, parse_config
+from apple_mail_mcp.config import is_all_mail, is_trash, load_config, parse_config
 
 
 def test_account_lookup_by_name_and_id(config):
@@ -89,6 +89,47 @@ def test_is_trash_matches_known_names(path):
 @pytest.mark.parametrize("path", ["INBOX", "Archive", "work/trashcan ideas"])
 def test_is_trash_ignores_other_names(path):
     assert not is_trash(path)
+
+
+@pytest.mark.parametrize(
+    "path", ["[Gmail]/All Mail", "all mail", "AlL mAiL", "[Gmail]/  All Mail  "]
+)
+def test_is_all_mail_matches_known_names(path):
+    assert is_all_mail(path)
+
+
+@pytest.mark.parametrize("path", ["Archive", "Filed/All Mail Backups", "INBOX"])
+def test_is_all_mail_ignores_other_names(path):
+    assert not is_all_mail(path)
+
+
+def _all_mail_config():
+    return parse_config(
+        {
+            "accounts": [
+                {
+                    "name": "g",
+                    "mailboxes": [
+                        {
+                            "path": "[Gmail]/All Mail",
+                            "move_to": True,
+                            "move_from": True,
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+
+def test_all_mail_is_never_a_move_target():
+    with pytest.raises(ValueError, match="Refusing to move messages into"):
+        _all_mail_config().require("g", "[Gmail]/All Mail", "move_to")
+
+
+def test_all_mail_is_never_a_move_source():
+    with pytest.raises(ValueError, match="Refusing to move messages out of"):
+        _all_mail_config().require("g", "[Gmail]/All Mail", "move_from")
 
 
 def test_account_specifier_prefers_id(config):
