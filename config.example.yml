@@ -29,10 +29,12 @@ accounts:
     mailboxes:
       - path: INBOX
         move_from: true
-      # The archive target needs no move_to, but list it to make it readable
-      # and to allow moving messages back out of it.
+      # The archive target needs no move_to for archive_message, but list it to
+      # make it readable, to file into it with move_message, and to move
+      # messages back out of it.
       - path: Archive
         move_from: true
+        move_to: true
       - path: "Filed/*"
         move_to: true
 
@@ -43,6 +45,7 @@ accounts:
         move_from: true
       - path: Archive
         move_from: true
+        move_to: true
       - path: "Filed/*"
         move_to: true
       # Readable, but nothing may be filed here and nothing may leave.

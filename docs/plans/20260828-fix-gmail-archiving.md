@@ -17,7 +17,7 @@ Two independent defects produce that:
    along. Success is therefore reported unconditionally.
 
 The fix addresses both: refuse the label-less view as a move target *or source*, and make every
-move prove the message is gone from where it started.
+move check, in the same round trip, that Mail no longer lists the message where it started.
 
 **Verified constraint:** `/System/Applications/Mail.app/Contents/Resources/Mail.sdef` contains
 zero occurrences of "archive". There is no scriptable Archive command and no archive-mailbox
@@ -200,6 +200,22 @@ verified = still_there == 0
 Fails **closed**: zero is what marks a move verified, so a missing or unparseable count must not
 produce one. `_as_count` returning `-1` rather than raising keeps a garbled field from being
 reported as a `ValueError`, which in this project's taxonomy means "invalid input".
+
+**What `verified` does and does not prove.** The count runs synchronously after `move` in the
+same script, so `verified: true` says only that Mail's local store no longer lists that
+Message-ID in the source *at that instant*. It cannot see the server later rejecting or
+reverting the IMAP expunge / label removal — the reported symptom, messages reappearing in the
+INBOX under fresh ids, is exactly a case where the local removal happened and `verified` is
+`true`. What it does catch reliably is the self-move no-op, where Mail short-circuits and never
+removes the message locally: the primary bug. Every statement of the guarantee — the two tool
+docstrings, README, CLAUDE.md — must say that much and no more. A second round trip or any
+polling to close the gap is out of scope.
+
+`verified: false` is likewise two states, not one: `still_there > 0` (demonstrably still in the
+source) and `-1` (Mail reported no count, so the move is unconfirmed and may well have
+succeeded). The docstrings must send the caller to `warning` rather than letting it read `false`
+as failure — a blind retry raises, because `first message of mb whose id is <old id>` no longer
+resolves in the source.
 
 **Warning text** when `verified` is false:
 
@@ -403,9 +419,12 @@ four combinations are legal and two of them need tests (see Task 4).
   if the account has none, create it in Gmail's own interface first.
 - Point the live config's gmail `archive_mailbox` at that label, and grant it an entry with
   `move_from` if you want to move messages back *out* of it later.
-- Archive **one** message and read the response. `verified: true` means the INBOX label was
-  genuinely removed. `verified: false` means it was not — re-check with `list_messages` before
-  concluding, since a few seconds of IMAP sync lag can produce a false negative.
+- Archive **one** message and read the response. `verified: true` means Mail reported the
+  message gone from the INBOX at the time of the move; confirm with `list_messages` a minute
+  later that it stayed gone, since a server-side revert is invisible to the check. `verified:
+  false` means either it was still there or Mail reported no count — read the `warning`, and
+  re-check with `list_messages` before concluding, since a few seconds of IMAP sync lag can
+  produce a false negative.
 - Only after one message verifies clean should the 125-message batch be attempted.
 
 **Breaking change to announce:**

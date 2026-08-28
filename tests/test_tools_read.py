@@ -99,5 +99,10 @@ def test_move_tools_document_verified():
         assert "verified: true" in tool.__doc__
         assert "verified: false" in tool.__doc__
         assert "warning" in tool.__doc__
+        # verified: false is two states, and the agent must not read it as failure
+        assert "did not report a count" in tool.__doc__
+        assert "list_messages" in tool.__doc__
+        # verified: true is Mail's local view, not a server-side commitment
+        assert "at the time of the move" in tool.__doc__
     assert "unverified" in server.archive_message.__doc__
     assert "archived" in server.archive_message.__doc__

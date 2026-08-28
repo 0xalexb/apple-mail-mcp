@@ -25,7 +25,8 @@ are separated from the domain ones. `applescript.py` is the seam tests fake.
 - Permissions: `read`, `mark_read`, `flag`, `move_from`, `move_to`; first matching rule wins
 - Handles are `account/mailbox/path#id`; ids are reassigned on move, so mutations re-find the
   message by RFC Message-ID and return the new handle. Arrival is only half of it: a move also
-  counts the message in the *source* afterwards and reports `verified`
+  counts the message in the *source* afterwards and reports `verified` — Mail's local view at
+  the moment of the move, not proof the server kept the change
 - Flag index: 0-6 = red, orange, yellow, green, blue, purple, gray; -1 = unflagged
 - AppleScript payloads are framed with `\x1f` (fields) and `\x1e` (records)
 
