@@ -46,9 +46,8 @@ def test_list_mailboxes_hides_mailboxes_outside_the_allowlist(config, fake_runne
     assert ("iCloud", "private/diary") not in paths
 
 
-def test_list_mailboxes_reports_permissions_and_archive(config, fake_runner):
+def test_list_mailboxes_hides_all_mail(config, fake_runner):
     svc, _ = service(config, fake_runner, f"[Gmail]/All Mail{US}0{RS}", "")
-    # Not allowlisted, so it is filtered out despite being the archive target.
     assert svc.list_mailboxes() == []
 
 

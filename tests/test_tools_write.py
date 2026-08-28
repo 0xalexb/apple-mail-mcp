@@ -170,9 +170,9 @@ def test_archive_moves_to_the_configured_mailbox(config, fake_runner):
     svc, runner = service(config, fake_runner, f"<a@b>{US}200")
     result = svc.archive_message("gmail/INBOX#127614")
 
-    assert result["handle"] == "gmail/[Gmail]/All Mail#200"
+    assert result["handle"] == "gmail/Archive#200"
     assert result["operation"] == "archive"
-    assert 'mailbox "[Gmail]/All Mail"' in runner.script
+    assert 'mailbox "Archive"' in runner.script
 
 
 def test_archive_target_need_not_carry_move_to(config, fake_runner):

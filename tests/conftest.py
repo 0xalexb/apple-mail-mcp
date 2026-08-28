@@ -35,7 +35,7 @@ def config():
                 {
                     "name": "gmail",
                     "id": "A1B2C3D4-0000-0000-0000-000000000000",
-                    "archive_mailbox": "[Gmail]/All Mail",
+                    "archive_mailbox": "Archive",
                     "mailboxes": [
                         {"path": "INBOX", "move_from": True},
                         {"path": "Filed/*", "move_to": True},
