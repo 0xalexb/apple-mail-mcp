@@ -6,7 +6,6 @@ from apple_mail_mcp.applescript import RS, US, OsascriptRunner, quote
 from apple_mail_mcp.config import (
     Config,
     advertised_permissions,
-    is_all_mail,
     is_trash,
 )
 
@@ -299,18 +298,13 @@ end tell
 
         if operation == "archive":
             # The archive target is named by the account's own config, so it is
-            # trusted for move_to. `parse_config` rejects both of these targets at
-            # load; the guards here cover a Config assembled without it.
+            # trusted for move_to. `parse_config` rejects Trash at load; this guard
+            # covers a Config assembled without it.
             destination = self._config.account(destination_key)
             if is_trash(target_mailbox):
                 raise ValueError(
                     f"Refusing to archive into '{target_mailbox}'. "
                     "This server does not delete mail."
-                )
-            if is_all_mail(target_mailbox):
-                raise ValueError(
-                    f"Refusing to archive into '{target_mailbox}'. "
-                    "Every message already appears there, so the move would be a no-op."
                 )
         else:
             destination = self._config.require(

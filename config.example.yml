@@ -23,9 +23,10 @@ accounts:
   - name: gmail
     # Optional. Survives renaming the account in Mail, and wins over `name`.
     id: A1B2C3D4-1234-5678-90AB-CDEF12345678
-    # Required for archive_message. Must be a real mailbox: on Gmail an actual
-    # label, never "[Gmail]/All Mail". See the Archiving section of README.md.
-    archive_mailbox: Archive
+    # Required for archive_message. On Gmail this is usually "[Gmail]/All Mail",
+    # which Apple Mail designates as the Archive Mailbox; check `verified` on the
+    # result, since the move is a no-op on some accounts. See README.md.
+    archive_mailbox: "[Gmail]/All Mail"
     mailboxes:
       - path: INBOX
         move_from: true
