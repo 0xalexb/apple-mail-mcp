@@ -315,31 +315,31 @@ four combinations are legal and two of them need tests (see Task 4).
 - Modify: `README.md`
 - Modify: `tests/test_tools_read.py`
 
-- [ ] `mail_service.py:275` — the "no archive_mailbox configured" error currently reads
+- [x] `mail_service.py:275` — the "no archive_mailbox configured" error currently reads
       "Gmail-style accounts archive to '[Gmail]/All Mail'"; after Task 3 that instructs the user
       to configure the exact value that now hard-fails at load. Rewrite it to name a real label
-- [ ] add a sentence about `verified` to the `move_message` and `archive_message` tool
+- [x] add a sentence about `verified` to the `move_message` and `archive_message` tool
       docstrings — that string is the only thing a calling agent reads before deciding the
       archive worked
-- [ ] `config.example.yml`: gmail `archive_mailbox` becomes `Archive`, with a comment saying why
+- [x] `config.example.yml`: gmail `archive_mailbox` becomes `Archive`, with a comment saying why
       All Mail is refused. Leave the glob-syntax comment at line 8 alone
-- [ ] `README.md` config sample (line 92): same change
-- [ ] `README.md:47-48`: "re-find the message by its RFC Message-ID and return its **new**
+- [x] `README.md` config sample (line 92): same change
+- [x] `README.md:47-48`: "re-find the message by its RFC Message-ID and return its **new**
       handle" is the arrival-only claim that made this bug invisible — add the departure half
-- [ ] `README.md` tool table (lines 26-27): note that **both** `move_message` and
+- [x] `README.md` tool table (lines 26-27): note that **both** `move_message` and
       `archive_message` report `verified`
-- [ ] `README.md` Archiving prose (lines 125-127): "Gmail accounts have none and archive by
+- [x] `README.md` Archiving prose (lines 125-127): "Gmail accounts have none and archive by
       moving to `[Gmail]/All Mail`" states the bug as fact — rewrite to say Gmail archives to a
       real label and that All Mail is refused as source and target
-- [ ] `README.md:129-131`: "It does need its own entry with `move_from` if you want to move
+- [x] `README.md:129-131`: "It does need its own entry with `move_from` if you want to move
       messages back *out* of it" — correct for a real label, but anyone who followed it for a
       Gmail account granted `move_from` on `[Gmail]/All Mail`, which Task 1 now refuses at call
       time. Say that All Mail is the one archive target this does not work for
-- [ ] add a *Notes on Apple Mail* bullet for the All Mail no-op, next to the existing
+- [x] add a *Notes on Apple Mail* bullet for the All Mail no-op, next to the existing
       "Gmail reports the wrong mailbox" bullet
-- [ ] extend the docstring test at `tests/test_tools_read.py:79-93` (or add one) asserting
+- [x] extend the docstring test at `tests/test_tools_read.py:79-93` (or add one) asserting
       "verified" appears in both tool docstrings — Task 5 changes source, so it owes tests
-- [ ] run `uv run pytest` — must pass before task 6
+- [x] run `uv run pytest` — must pass before task 6
 
 ### Task 6: Verify acceptance criteria
 

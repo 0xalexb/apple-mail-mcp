@@ -23,9 +23,10 @@ accounts:
   - name: gmail
     # Optional. Survives renaming the account in Mail, and wins over `name`.
     id: A1B2C3D4-1234-5678-90AB-CDEF12345678
-    # Required for archive_message. Gmail has no "Archive" mailbox; archiving
-    # means moving to All Mail. iCloud does have a real top-level "Archive".
-    archive_mailbox: "[Gmail]/All Mail"
+    # Required for archive_message. Must be a real mailbox: on Gmail an actual
+    # label, never "[Gmail]/All Mail", which is the label-less view of every
+    # message and is refused at load because moving into it does nothing.
+    archive_mailbox: Archive
     mailboxes:
       - path: INBOX
         move_from: true

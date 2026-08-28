@@ -90,13 +90,13 @@ def set_flag(handle: str, color: str | None = None) -> dict:
 def move_message(
     handle: str, target_mailbox: str, target_account: str | None = None
 ) -> dict:
-    """Moves a message to another mailbox. Requires move_from on the source and move_to on the target. target_account defaults to the message's own account. Returns the message's new handle. Trash and Junk mailboxes are refused: this server never deletes mail."""
+    """Moves a message to another mailbox. Requires move_from on the source and move_to on the target. target_account defaults to the message's own account. Returns the message's new handle. Trash and Junk mailboxes are refused: this server never deletes mail. The result carries verified: true only when the message is confirmed gone from the source mailbox; verified: false means it is still there and comes with a warning explaining why."""
     return _get_service().move_message(handle, target_mailbox, target_account)
 
 
 @mcp.tool()
 def archive_message(handle: str) -> dict:
-    """Moves a message to its account's configured archive mailbox. Returns the message's new handle."""
+    """Moves a message to its account's configured archive mailbox. Returns the message's new handle. The result carries verified: true only when the message is confirmed gone from the source mailbox; verified: false means the archive did not take effect and comes with a warning explaining why. Do not report an unverified result as archived."""
     return _get_service().archive_message(handle)
 
 
