@@ -345,6 +345,9 @@ tell application "Mail"
 end tell
 """
         fields = self._run(script).split(US)
+        # Stricter than read_message, whose last field is a body that may itself
+        # contain the separator. This payload is three fixed fields, so a fourth
+        # means the framing is wrong.
         if len(fields) != 3:
             raise RuntimeError(f"Unexpected response moving {handle}")
         rfc, new_id = fields[0], fields[1].strip()
@@ -370,20 +373,9 @@ end tell
                 "in the target yet, most likely because the account is still "
                 "syncing. Find it again with list_messages."
             )
-        if still_there < 0:
-            result["warning"] = (
-                f"Mail did not report whether the message left '{mailbox}', so the "
-                "move is unconfirmed. Check with list_messages before retrying."
-            )
-        elif not verified:
-            result["warning"] = (
-                f"The message is still in '{mailbox}' after the move, so it did not "
-                "leave that mailbox. On Gmail this happens when the target is the "
-                "label-less All Mail view rather than a real label. It can also mean "
-                "the account is still syncing, or that a second copy carrying the "
-                "same Message-ID remains there — re-check with list_messages before "
-                "retrying."
-            )
+        warning = _move_warning(mailbox, still_there)
+        if warning:
+            result["warning"] = warning
         return result
 
 
@@ -426,16 +418,31 @@ def _as_bool(value: str) -> bool:
     return value.strip().lower() == "true"
 
 
+# Blank or garbled must never read as zero: zero is what marks a move verified,
+# and this field exists to keep an unproven move from looking like a proven one.
 def _as_count(value: str) -> int:
-    """A source-side count, or -1 when Mail reported none.
-
-    Blank or garbled must never read as zero: zero is what marks a move verified,
-    and this field exists to keep an unproven move from looking like a proven one.
-    """
     try:
         return int(value.strip())
     except ValueError:
         return -1
+
+
+def _move_warning(source_mailbox: str, still_there: int) -> str | None:
+    if still_there < 0:
+        return (
+            f"Mail did not report whether the message left '{source_mailbox}', so the "
+            "move is unconfirmed. Check with list_messages before retrying."
+        )
+    if still_there > 0:
+        return (
+            f"The message is still in '{source_mailbox}' after the move, so it did not "
+            "leave that mailbox. On Gmail this happens when the target is the "
+            "label-less All Mail view rather than a real label. It can also mean "
+            "the account is still syncing, or that a second copy carrying the "
+            "same Message-ID remains there — re-check with list_messages before "
+            "retrying."
+        )
+    return None
 
 
 def _flag_color(value: str) -> str | None:

@@ -150,8 +150,6 @@ def test_a_missing_source_count_is_never_read_as_success(config, fake_runner, co
 
 
 def test_nothing_after_the_move_can_abort_the_script(config, fake_runner):
-    """A statement that can fail after `move` turns a done move into an error,
-    and the runner retries the whole script on -600, moving twice."""
     svc, runner = service(config, fake_runner, f"<a@b>{US}9{US}0")
     svc.move_message("gmail/INBOX#1", "Filed/x")
     lines = [line.strip() for line in runner.script.splitlines()]
@@ -191,38 +189,6 @@ def test_move_across_accounts(config, fake_runner):
     assert 'account "iCloud"' in runner.script
 
 
-# -- the no-deletion guarantee --------------------------------------------
-
-
-def test_move_into_trash_is_refused_even_when_allowlisted(config, fake_runner):
-    """[Gmail]/Trash carries move_to in the fixture; the guard must still refuse."""
-    svc, runner = service(config, fake_runner)
-    with pytest.raises(ValueError, match="does not delete mail"):
-        svc.move_message("gmail/INBOX#1", "[Gmail]/Trash")
-    assert runner.scripts == []
-
-
-def test_no_delete_tool_is_exposed():
-    from apple_mail_mcp import server
-
-    exposed = {name for name in dir(server) if not name.startswith("_")}
-    assert not {n for n in exposed if "delete" in n or "trash" in n}
-
-
-def test_service_never_emits_a_delete_command(config, fake_runner):
-    svc, runner = service(config, fake_runner, "ok", "ok", f"<a@b>{US}2{US}0")
-    svc.set_read_status("gmail/INBOX#1", read=True)
-    svc.set_flag("gmail/INBOX#1", "red")
-    svc.move_message("gmail/INBOX#1", "Filed/x")
-
-    for script in runner.scripts:
-        assert "delete" not in script.lower()
-        assert "deleted status" not in script.lower()
-
-
-# -- the label-less view ---------------------------------------------------
-
-
 def _all_mail_service(fake_runner):
     from apple_mail_mcp.config import parse_config
 
@@ -258,6 +224,35 @@ def test_move_out_of_all_mail_is_refused_even_when_allowlisted(fake_runner):
     with pytest.raises(ValueError, match="a message never leaves it"):
         svc.move_message("g/[Gmail]/All Mail#1", "INBOX")
     assert runner.scripts == []
+
+
+# -- the no-deletion guarantee --------------------------------------------
+
+
+def test_move_into_trash_is_refused_even_when_allowlisted(config, fake_runner):
+    """[Gmail]/Trash carries move_to in the fixture; the guard must still refuse."""
+    svc, runner = service(config, fake_runner)
+    with pytest.raises(ValueError, match="does not delete mail"):
+        svc.move_message("gmail/INBOX#1", "[Gmail]/Trash")
+    assert runner.scripts == []
+
+
+def test_no_delete_tool_is_exposed():
+    from apple_mail_mcp import server
+
+    exposed = {name for name in dir(server) if not name.startswith("_")}
+    assert not {n for n in exposed if "delete" in n or "trash" in n}
+
+
+def test_service_never_emits_a_delete_command(config, fake_runner):
+    svc, runner = service(config, fake_runner, "ok", "ok", f"<a@b>{US}2{US}0")
+    svc.set_read_status("gmail/INBOX#1", read=True)
+    svc.set_flag("gmail/INBOX#1", "red")
+    svc.move_message("gmail/INBOX#1", "Filed/x")
+
+    for script in runner.scripts:
+        assert "delete" not in script.lower()
+        assert "deleted status" not in script.lower()
 
 
 # -- archiving -------------------------------------------------------------
