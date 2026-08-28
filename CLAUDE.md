@@ -57,11 +57,8 @@ ones that will silently cost you: iterating `messages of mb` directly is 25x slo
 returns a list unless the left operand is text, and moving to `[Gmail]/All Mail` no-ops while
 reporting success.
 
-Nothing in `_move`'s script may abort after `move m to target`. `OsascriptRunner` retries the
-whole script on `-600`, so a post-move failure re-runs the move; and an aborted script means a
-mutation that happened is reported as an error. Hence the source-side count sits in its own
-`try` with `stillThere` pre-set to `-1` beforehand, so the variable is defined at the `return`
-either way. A `-1` reaches the caller as `verified: false`, never as success.
+Nothing in `_move`'s script may abort after `move m to target`, or the runner's `-600` retry
+moves twice; see the comment above the script in `_move` for the shape that prevents it.
 
 ## Distribution
 

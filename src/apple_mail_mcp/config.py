@@ -99,22 +99,9 @@ class Config:
                 f"'{capability}' is not permitted on mailbox '{path}' "
                 f"of account '{account.name}'"
             )
-        if capability == "move_to" and is_trash(path):
-            raise ValueError(
-                f"Refusing to move messages into '{path}'. This server does not delete mail."
-            )
-        if capability == "move_to" and is_all_mail(path):
-            raise ValueError(
-                f"Refusing to move messages into '{path}'. It is the label-less view of "
-                f"every message, not a folder, so the move does nothing. "
-                f"Use a real label such as 'Archive'."
-            )
-        if capability == "move_from" and is_all_mail(path):
-            raise ValueError(
-                f"Refusing to move messages out of '{path}'. It is the label-less view of "
-                f"every message, so a message never leaves it. "
-                f"Move from a real label such as 'INBOX' instead."
-            )
+        refusal = _refusal(path, capability)
+        if refusal:
+            raise ValueError(refusal)
         return account
 
 
@@ -131,26 +118,48 @@ def matches(path: str, pattern: str) -> bool:
     return re.fullmatch(escaped, path) is not None
 
 
-def advertised_permissions(path: str, permissions: Permissions) -> Permissions:
-    """Capabilities a caller can actually use, for reporting rather than enforcing.
-
-    A rule may grant move_to on Trash or either move on All Mail; `require` refuses
-    both regardless. Reporting the raw grant hands an agent a capability that throws
-    on first use.
-    """
-    if is_all_mail(path):
-        return replace(permissions, move_from=False, move_to=False)
-    if is_trash(path):
-        return replace(permissions, move_to=False)
-    return permissions
-
-
 def is_trash(path: str) -> bool:
     return path.rsplit("/", 1)[-1].strip().lower() in _TRASH_LEAVES
 
 
 def is_all_mail(path: str) -> bool:
     return path.rsplit("/", 1)[-1].strip().lower() in _ALL_MAIL_LEAVES
+
+
+def _refusal(path: str, capability: str) -> str | None:
+    """The reason this mailbox may not be used this way, or None when it may.
+
+    Single-sourced so that `require` and `advertised_permissions` cannot drift:
+    a capability that is refused here is never advertised as available.
+    """
+    if capability == "move_to" and is_trash(path):
+        return (
+            f"Refusing to move messages into '{path}'. This server does not delete mail."
+        )
+    if capability == "move_to" and is_all_mail(path):
+        return (
+            f"Refusing to move messages into '{path}'. It is the label-less view of "
+            f"every message, not a folder, so the move does nothing. "
+            f"Use a real label such as 'Archive'."
+        )
+    if capability == "move_from" and is_all_mail(path):
+        return (
+            f"Refusing to move messages out of '{path}'. It is the label-less view of "
+            f"every message, so a message never leaves it. "
+            f"Move from a real label such as 'INBOX' instead."
+        )
+    return None
+
+
+def advertised_permissions(path: str, permissions: Permissions) -> Permissions:
+    """Capabilities a caller can actually use, for reporting rather than enforcing.
+
+    A rule may grant move_to on Trash or either move on All Mail; `require` refuses
+    them regardless. Reporting the raw grant hands an agent a capability that throws
+    on first use.
+    """
+    masked = {field: False for field in _PERMISSION_FIELDS if _refusal(path, field)}
+    return replace(permissions, **masked) if masked else permissions
 
 
 def _as_literal(value: str) -> str:
@@ -214,17 +223,19 @@ def _account(entry: dict, defaults: Permissions) -> AccountConfig:
         raise ValueError(f"Account '{name}' lists no mailboxes, so nothing is allowed")
 
     archive_mailbox = entry.get("archive_mailbox")
-    if archive_mailbox and is_all_mail(str(archive_mailbox)):
-        raise ValueError(
-            f"Account '{name}' sets archive_mailbox to '{archive_mailbox}'. Gmail "
-            f"archives by moving to a real label such as 'Archive'; "
-            f"'{archive_mailbox}' is not a folder and the move silently does nothing."
-        )
-    if archive_mailbox and is_trash(str(archive_mailbox)):
-        raise ValueError(
-            f"Account '{name}' sets archive_mailbox to '{archive_mailbox}'. "
-            f"Archiving is not deletion; name a real mailbox such as 'Archive'."
-        )
+    if archive_mailbox:
+        archive_mailbox = str(archive_mailbox)
+        if is_all_mail(archive_mailbox):
+            raise ValueError(
+                f"Account '{name}' sets archive_mailbox to '{archive_mailbox}'. Gmail "
+                f"archives by moving to a real label such as 'Archive'; "
+                f"'{archive_mailbox}' is not a folder and the move silently does nothing."
+            )
+        if is_trash(archive_mailbox):
+            raise ValueError(
+                f"Account '{name}' sets archive_mailbox to '{archive_mailbox}'. "
+                f"Archiving is not deletion; name a real mailbox such as 'Archive'."
+            )
 
     return AccountConfig(
         name=str(name),

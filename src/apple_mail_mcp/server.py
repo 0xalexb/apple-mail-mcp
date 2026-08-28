@@ -30,7 +30,7 @@ def ping() -> str:
 
 @mcp.tool()
 def list_mailboxes() -> list[dict]:
-    """Returns the mailboxes this server is allowed to touch, with unread counts and the permissions granted on each. Mailbox paths are full paths from the account root, e.g. 'Filed/Finance'."""
+    """Returns the mailboxes this server is allowed to touch, with unread counts and the permissions usable on each. Mailbox paths are full paths from the account root, e.g. 'Filed/Finance'."""
     return _get_service().list_mailboxes()
 
 

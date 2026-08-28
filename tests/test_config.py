@@ -98,6 +98,21 @@ def test_is_trash_ignores_other_names(path):
     assert not is_trash(path)
 
 
+def test_trash_archive_mailbox_is_rejected_at_load():
+    with pytest.raises(ValueError, match="Archiving is not deletion"):
+        parse_config(
+            {
+                "accounts": [
+                    {
+                        "name": "g",
+                        "archive_mailbox": "[Gmail]/Trash",
+                        "mailboxes": ["INBOX"],
+                    }
+                ]
+            }
+        )
+
+
 @pytest.mark.parametrize(
     "path", ["[Gmail]/All Mail", "all mail", "AlL mAiL", "[Gmail]/  All Mail  "]
 )
@@ -156,30 +171,33 @@ def test_all_mail_archive_mailbox_is_rejected_at_load():
         )
 
 
-def test_trash_archive_mailbox_is_rejected_at_load():
-    with pytest.raises(ValueError, match="Archiving is not deletion"):
-        parse_config(
-            {
-                "accounts": [
-                    {
-                        "name": "g",
-                        "archive_mailbox": "[Gmail]/Trash",
-                        "mailboxes": ["INBOX"],
-                    }
-                ]
-            }
-        )
-
-
-def test_advertised_permissions_mask_what_require_refuses():
+@pytest.mark.parametrize("path", ["[Gmail]/All Mail", "[Gmail]/Trash", "Archive"])
+def test_advertised_permissions_mask_what_require_refuses(path):
     granted = Permissions(move_from=True, move_to=True)
-    all_mail = advertised_permissions("[Gmail]/All Mail", granted)
-    assert (all_mail.move_from, all_mail.move_to) == (False, False)
+    cfg = parse_config(
+        {
+            "accounts": [
+                {
+                    "name": "a",
+                    "mailboxes": [
+                        {"path": path, "move_from": True, "move_to": True}
+                    ],
+                }
+            ]
+        }
+    )
+    advertised = advertised_permissions(path, granted).as_dict()
 
-    trash = advertised_permissions("[Gmail]/Trash", granted)
-    assert (trash.move_from, trash.move_to) == (True, False)
-
-    assert advertised_permissions("Archive", granted) == granted
+    for capability in ("move_from", "move_to"):
+        try:
+            cfg.require("a", path, capability)
+        except ValueError:
+            refused = True
+        else:
+            refused = False
+        assert advertised[capability] is not refused, (
+            f"advertised {capability} on '{path}' disagrees with require"
+        )
 
 
 def test_real_label_archive_mailbox_still_parses():

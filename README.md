@@ -125,7 +125,7 @@ Paths are **full paths from the account root**, slash-separated, exactly as
 leaf-only names, so nesting is not obvious; ask `list_mailboxes` rather than guessing.
 
 In patterns `*` and `?` are the only wildcards, and `*` spans `/`, so `work/*` covers the
-whole subtree. Square brackets are literal, so Gmail's `[Gmail]/All Mail` works as written.
+whole subtree. Square brackets are literal, so Gmail's `[Gmail]/Sent Mail` works as written.
 
 ### Archiving
 

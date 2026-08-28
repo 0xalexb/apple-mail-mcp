@@ -5,7 +5,7 @@
 # them: "Filed/Finance/Statements", not "Finance/Statements".
 #
 # In patterns, '*' and '?' are the only wildcards and '*' spans '/'. Square
-# brackets are literal, so Gmail's "[Gmail]/All Mail" works as written.
+# brackets are literal, so Gmail's "[Gmail]/Sent Mail" works as written.
 #
 # Rules are evaluated in order and the first match wins.
 
@@ -24,10 +24,7 @@ accounts:
     # Optional. Survives renaming the account in Mail, and wins over `name`.
     id: A1B2C3D4-1234-5678-90AB-CDEF12345678
     # Required for archive_message. Must be a real mailbox: on Gmail an actual
-    # label, never "[Gmail]/All Mail", which is the label-less view of every
-    # message and is refused at load because moving into it does nothing.
-    # Allowlisting an All Mail path below is refused too, but only when a move
-    # runs: the config still loads clean and the first move against it raises.
+    # label, never "[Gmail]/All Mail". See the Archiving section of README.md.
     archive_mailbox: Archive
     mailboxes:
       - path: INBOX
@@ -45,7 +42,7 @@ accounts:
       - path: INBOX
         move_from: true
       - path: Archive
-        move_to: true
+        move_from: true
       - path: "Filed/*"
         move_to: true
       # Readable, but nothing may be filed here and nothing may leave.
