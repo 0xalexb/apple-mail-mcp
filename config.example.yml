@@ -1,0 +1,45 @@
+# apple-mail-mcp configuration
+#
+# Every mailbox is denied until it is listed here. Mailbox paths are FULL paths
+# from the account root, slash-separated, exactly as `list_mailboxes` reports
+# them: "Filed/Finance/Statements", not "Finance/Statements".
+#
+# In patterns, '*' and '?' are the only wildcards and '*' spans '/'. Square
+# brackets are literal, so Gmail's "[Gmail]/All Mail" works as written.
+#
+# Rules are evaluated in order and the first match wins.
+
+defaults:
+  read: true
+  mark_read: true
+  flag: true
+  move_from: false
+  move_to: false
+
+timeout_seconds: 120
+max_page_size: 100
+
+accounts:
+  - name: gmail
+    # Optional. Survives renaming the account in Mail, and wins over `name`.
+    id: A1B2C3D4-1234-5678-90AB-CDEF12345678
+    # Required for archive_message. Gmail has no "Archive" mailbox; archiving
+    # means moving to All Mail. iCloud does have a real top-level "Archive".
+    archive_mailbox: "[Gmail]/All Mail"
+    mailboxes:
+      - path: INBOX
+        move_from: true
+      - path: "Filed/*"
+        move_to: true
+
+  - name: iCloud
+    archive_mailbox: Archive
+    mailboxes:
+      - path: INBOX
+        move_from: true
+      - path: Archive
+        move_to: true
+      - path: "Filed/*"
+        move_to: true
+      # Readable, but nothing may be filed here and nothing may leave.
+      - path: "Payroll"

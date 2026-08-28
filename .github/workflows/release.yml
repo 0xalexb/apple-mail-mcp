@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Install dependencies
+        run: uv sync
+      - name: Run tests
+        run: uv run pytest
+      # uv.lock does not apply to `uvx --from git+...`, which is how the released
+      # wrapper runs. Resolve fresh from PyPI so an unbounded dependency that
+      # breaks at runtime fails the release instead of shipping green.
+      - name: Verify fresh dependency resolution
+        run: uvx --from . apple-mail-mcp --version
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate wrapper script
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          cat > apple-mail-mcp <<'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          VERSION="__VERSION__"
+
+          if [[ "${1:-}" == "--version" || "${1:-}" == "-V" ]]; then
+            echo "apple-mail-mcp ${VERSION}"
+            exit 0
+          fi
+
+          exec uvx --from "git+https://github.com/0xalexb/apple-mail-mcp@v${VERSION}" apple-mail-mcp "$@"
+          SCRIPT
+          sed -i "s/__VERSION__/${RELEASE_VERSION}/" apple-mail-mcp
+          chmod +x apple-mail-mcp
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: apple-mail-mcp
+
+  homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download script and compute checksum
+        id: checksum
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          REPO="${{ github.repository }}"
+          DOWNLOAD_OK=false
+          for i in 1 2 3 4 5; do
+            if curl -fSL "https://github.com/${REPO}/releases/download/v${VERSION}/apple-mail-mcp" -o apple-mail-mcp; then
+              DOWNLOAD_OK=true
+              break
+            fi
+            echo "Attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
+          if [ "$DOWNLOAD_OK" != "true" ]; then
+            echo "::error::Failed to download apple-mail-mcp after 5 attempts"
+            exit 1
+          fi
+          SHA=$(sha256sum apple-mail-mcp | awk '{print $1}')
+          echo "SHA256=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/homebrew-apps
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        env:
+          RELEASE_VERSION: ${{ steps.checksum.outputs.VERSION }}
+          RELEASE_SHA: ${{ steps.checksum.outputs.SHA256 }}
+          RELEASE_REPO: ${{ github.repository }}
+        run: |
+          cat > homebrew-tap/Formula/apple-mail-mcp.rb <<FORMULA
+          class AppleMailMcp < Formula
+            desc "MCP server for Apple Mail via AppleScript"
+            homepage "https://github.com/${RELEASE_REPO}"
+            url "https://github.com/${RELEASE_REPO}/releases/download/v${RELEASE_VERSION}/apple-mail-mcp"
+            sha256 "${RELEASE_SHA}"
+            version "${RELEASE_VERSION}"
+            license "MIT"
+
+            depends_on :macos
+            depends_on "uv"
+
+            def install
+              bin.install "apple-mail-mcp"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/apple-mail-mcp --version")
+            end
+          end
+          FORMULA
+
+      - name: Commit and push formula
+        working-directory: homebrew-tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/apple-mail-mcp.rb
+          git commit -m "apple-mail-mcp ${GITHUB_REF#refs/tags/v}"
+          git push
