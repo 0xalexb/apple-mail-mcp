@@ -5,7 +5,6 @@ import pytest
 from apple_mail_mcp.config import (
     Permissions,
     advertised_permissions,
-    is_all_mail,
     is_trash,
     load_config,
     parse_config,
@@ -113,65 +112,7 @@ def test_trash_archive_mailbox_is_rejected_at_load():
         )
 
 
-@pytest.mark.parametrize(
-    "path", ["[Gmail]/All Mail", "all mail", "AlL mAiL", "[Gmail]/  All Mail  "]
-)
-def test_is_all_mail_matches_known_names(path):
-    assert is_all_mail(path)
-
-
-@pytest.mark.parametrize("path", ["Archive", "Filed/All Mail Backups", "INBOX"])
-def test_is_all_mail_ignores_other_names(path):
-    assert not is_all_mail(path)
-
-
-def _all_mail_config():
-    return parse_config(
-        {
-            "accounts": [
-                {
-                    "name": "g",
-                    "mailboxes": [
-                        {
-                            "path": "[Gmail]/All Mail",
-                            "move_to": True,
-                            "move_from": True,
-                        }
-                    ],
-                }
-            ]
-        }
-    )
-
-
-def test_all_mail_is_never_a_move_target():
-    with pytest.raises(ValueError, match="label-less view.+Use a real label"):
-        _all_mail_config().require("g", "[Gmail]/All Mail", "move_to")
-
-
-def test_all_mail_is_never_a_move_source():
-    with pytest.raises(ValueError, match="a message never leaves it"):
-        _all_mail_config().require("g", "[Gmail]/All Mail", "move_from")
-
-
-def test_all_mail_archive_mailbox_is_rejected_at_load():
-    with pytest.raises(
-        ValueError, match="is not a folder and the move silently does nothing"
-    ):
-        parse_config(
-            {
-                "accounts": [
-                    {
-                        "name": "g",
-                        "archive_mailbox": "[Gmail]/All Mail",
-                        "mailboxes": ["INBOX"],
-                    }
-                ]
-            }
-        )
-
-
-@pytest.mark.parametrize("path", ["[Gmail]/All Mail", "[Gmail]/Trash", "Archive"])
+@pytest.mark.parametrize("path", ["[Gmail]/Trash", "Archive"])
 def test_advertised_permissions_mask_what_require_refuses(path):
     granted = Permissions(move_from=True, move_to=True)
     cfg = parse_config(

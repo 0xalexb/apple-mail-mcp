@@ -189,43 +189,6 @@ def test_move_across_accounts(config, fake_runner):
     assert 'account "iCloud"' in runner.script
 
 
-def _all_mail_service(fake_runner):
-    from apple_mail_mcp.config import parse_config
-
-    cfg = parse_config(
-        {
-            "accounts": [
-                {
-                    "name": "g",
-                    "mailboxes": [
-                        {"path": "INBOX", "move_from": True},
-                        {
-                            "path": "[Gmail]/All Mail",
-                            "move_from": True,
-                            "move_to": True,
-                        },
-                    ],
-                }
-            ]
-        }
-    )
-    return service(cfg, fake_runner)
-
-
-def test_move_into_all_mail_is_refused_even_when_allowlisted(fake_runner):
-    svc, runner = _all_mail_service(fake_runner)
-    with pytest.raises(ValueError, match="Use a real label"):
-        svc.move_message("g/INBOX#1", "[Gmail]/All Mail")
-    assert runner.scripts == []
-
-
-def test_move_out_of_all_mail_is_refused_even_when_allowlisted(fake_runner):
-    svc, runner = _all_mail_service(fake_runner)
-    with pytest.raises(ValueError, match="a message never leaves it"):
-        svc.move_message("g/[Gmail]/All Mail#1", "INBOX")
-    assert runner.scripts == []
-
-
 # -- the no-deletion guarantee --------------------------------------------
 
 
@@ -333,13 +296,6 @@ def _hand_built_config(archive_mailbox):
 def test_archive_into_trash_is_refused(fake_runner):
     svc, runner = service(_hand_built_config("Trash"), fake_runner)
     with pytest.raises(ValueError, match="does not delete mail"):
-        svc.archive_message("a/INBOX#1")
-    assert runner.scripts == []
-
-
-def test_archive_into_all_mail_is_refused(fake_runner):
-    svc, runner = service(_hand_built_config("[Gmail]/All Mail"), fake_runner)
-    with pytest.raises(ValueError, match="the move would be a no-op"):
         svc.archive_message("a/INBOX#1")
     assert runner.scripts == []
 

@@ -136,28 +136,25 @@ whole subtree. Square brackets are literal, so Gmail's `[Gmail]/Sent Mail` works
 ### Archiving
 
 `archive_mailbox` is per-account and required for `archive_message`, because there is no
-universal answer: iCloud has a real top-level `Archive`, and a Gmail account needs a real
-label — `Archive` if it has one, otherwise create one in Gmail's own interface.
+universal answer: iCloud has a real top-level `Archive`, while a Gmail account typically has
+none and Apple Mail designates `[Gmail]/All Mail` as its Archive Mailbox (Settings → Accounts
+→ Mailbox Behaviours).
 
-Any mailbox whose last path segment is `All Mail` — `[Gmail]/All Mail` and its equivalent in
-any other account, matched case- and whitespace-insensitively — is refused, as a source and as
-a target. It is Gmail's label-less view of every message, inbox included, so moving into it is
-a self-move that silently does nothing, and a message never leaves it. A config naming it as
-`archive_mailbox` fails to load; a mailbox rule granting it `move_from` or `move_to` loads but
-raises on the first move against it. Trash and Junk are likewise refused as archive targets,
-at load and at call time.
+The server does not second-guess that choice. `[Gmail]/All Mail` is Gmail's label-less view of
+every message, so a move into it can be a self-move that silently does nothing — but it is
+often the only archive target an account has, and refusing it would leave `archive_message`
+with nowhere to go. Instead the move is attempted and the result reports `verified`, so a
+no-op is visible rather than reported as success. Trash and Junk remain refused as archive
+targets: archiving is not deletion.
 
-> **Breaking, if you are upgrading.** Two configs that used to work now do not. A config with
-> `archive_mailbox: "[Gmail]/All Mail"` (or a Trash mailbox) **no longer loads** — the server
-> refuses to start until it names a real label. And a mailbox rule granting `move_from` or
-> `move_to` on an All Mail path still loads, but the first move against it raises. Both were
-> previously accepted and silently did nothing.
+> **If you archive to `[Gmail]/All Mail`, check `verified`.** On some Gmail accounts the move
+> is a no-op and the message stays in the INBOX. `verified: false` is the server telling you
+> that happened. Archive one message and read the result before running a batch.
 
 The archive mailbox does not need `move_to` — naming it as the account's archive is consent
 enough for `archive_message`, though the example grants it so `move_message` can file into it
 too. It does need its own entry with `move_from` if you want to move messages back *out* of
-it; otherwise archiving is one-way. This does not apply to All Mail: it cannot be an
-archive target in the first place, and it is refused as a source outright.
+it; otherwise archiving is one-way.
 
 ### MCP client
 
@@ -208,8 +205,9 @@ Things that cost real time to discover, kept here so they are not rediscovered:
 - **Moving to `[Gmail]/All Mail` is a no-op that reports success.** It is a view, not a
   label, so Mail sees a self-move, does nothing, and raises no error; the message is still
   in the INBOX afterwards. There is no scriptable Archive command either — `Mail.sdef`
-  contains no "archive" — so the only way to archive on Gmail is to move to a real label.
-  The static refusal matches the English leaf name only: a localized account names it
+  contains no "archive" — and Apple Mail still designates it as the Archive Mailbox for
+  Gmail accounts, so the server attempts the move and reports `verified` rather than
+  refusing a target the account may have no alternative to. A localized account names it
   `[Gmail]/Alle Nachrichten` or similar and slips past it, which is why every move also
   counts the message in the source afterwards and reports `verified`.
 - **`&` builds a list, not a string,** unless the left operand is text — and `id of m` is an

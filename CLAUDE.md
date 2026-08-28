@@ -42,14 +42,14 @@ There is no delete tool and no code path sets `deleted status`. Trash and Junk m
 refused as move targets even when allowlisted, and as an `archive_mailbox` at config load.
 `test_tools_write.py` asserts all of this; keep those tests passing.
 
-## All Mail is refused
+## All Mail is not refused
 
-Any mailbox whose leaf name is `all mail` (case- and whitespace-insensitive, any account) is
-Gmail's label-less view, not a mailbox: it is refused as a move source and as a move target even
-when allowlisted, and as an `archive_mailbox` at config load. Localized names slip past the leaf
-test and are caught only at runtime by `verified`. `list_mailboxes` masks the capabilities these
-guards refuse rather than advertising a permission that throws. `test_config.py` and
-`test_tools_write.py` assert this; keep those tests passing.
+Moving to `[Gmail]/All Mail` can be a no-op, but Apple Mail designates it as the Archive
+Mailbox for Gmail accounts and many have no other, so refusing it statically left
+`archive_message` unusable and — when the refusal ran at config load — took the whole read
+path down with it. The no-op is reported through `verified` instead. Only Trash and Junk are
+refused. `list_mailboxes` masks capabilities `require` refuses rather than advertising a
+permission that throws.
 
 ## AppleScript traps
 

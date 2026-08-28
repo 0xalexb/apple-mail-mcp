@@ -18,11 +18,6 @@ _TRASH_LEAVES = frozenset(
     {"trash", "deleted messages", "deleted items", "bin", "junk"}
 )
 
-# Never a move source or target. Gmail's All Mail is not a folder but the
-# label-less view of every message, inbox included, so a move into it is a
-# self-move that silently does nothing, and nothing ever leaves it.
-_ALL_MAIL_LEAVES = frozenset({"all mail"})
-
 
 @dataclass(frozen=True)
 class Permissions:
@@ -122,10 +117,6 @@ def is_trash(path: str) -> bool:
     return path.rsplit("/", 1)[-1].strip().lower() in _TRASH_LEAVES
 
 
-def is_all_mail(path: str) -> bool:
-    return path.rsplit("/", 1)[-1].strip().lower() in _ALL_MAIL_LEAVES
-
-
 def _refusal(path: str, capability: str) -> str | None:
     """The reason this mailbox may not be used this way, or None when it may.
 
@@ -136,27 +127,14 @@ def _refusal(path: str, capability: str) -> str | None:
         return (
             f"Refusing to move messages into '{path}'. This server does not delete mail."
         )
-    if capability == "move_to" and is_all_mail(path):
-        return (
-            f"Refusing to move messages into '{path}'. It is the label-less view of "
-            f"every message, not a folder, so the move does nothing. "
-            f"Use a real label such as 'Archive'."
-        )
-    if capability == "move_from" and is_all_mail(path):
-        return (
-            f"Refusing to move messages out of '{path}'. It is the label-less view of "
-            f"every message, so a message never leaves it. "
-            f"Move from a real label such as 'INBOX' instead."
-        )
     return None
 
 
 def advertised_permissions(path: str, permissions: Permissions) -> Permissions:
     """Capabilities a caller can actually use, for reporting rather than enforcing.
 
-    A rule may grant move_to on Trash or either move on All Mail; `require` refuses
-    them regardless. Reporting the raw grant hands an agent a capability that throws
-    on first use.
+    A rule may grant move_to on Trash; `require` refuses it regardless. Reporting
+    the raw grant hands an agent a capability that throws on first use.
     """
     masked = {field: False for field in _PERMISSION_FIELDS if _refusal(path, field)}
     return replace(permissions, **masked) if masked else permissions
@@ -225,12 +203,6 @@ def _account(entry: dict, defaults: Permissions) -> AccountConfig:
     archive_mailbox = entry.get("archive_mailbox")
     if archive_mailbox:
         archive_mailbox = str(archive_mailbox)
-        if is_all_mail(archive_mailbox):
-            raise ValueError(
-                f"Account '{name}' sets archive_mailbox to '{archive_mailbox}'. Gmail "
-                f"archives by moving to a real label such as 'Archive'; "
-                f"'{archive_mailbox}' is not a folder and the move silently does nothing."
-            )
         if is_trash(archive_mailbox):
             raise ValueError(
                 f"Account '{name}' sets archive_mailbox to '{archive_mailbox}'. "
