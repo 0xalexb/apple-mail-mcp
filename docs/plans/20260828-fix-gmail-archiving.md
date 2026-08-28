@@ -343,25 +343,25 @@ four combinations are legal and two of them need tests (see Task 4).
 
 ### Task 6: Verify acceptance criteria
 
-- [ ] `archive_message` on a Gmail account can no longer target the label-less view — refused at
+- [x] `archive_message` on a Gmail account can no longer target the label-less view — refused at
       config load, in the archive branch, and as a `move_to` target
-- [ ] All Mail is refused as a `move_from` source, so no move can report a permanent
+- [x] All Mail is refused as a `move_from` source, so no move can report a permanent
       `verified: false`
-- [ ] every move and archive result carries `verified`, and an unverified move carries a
+- [x] every move and archive result carries `verified`, and an unverified move carries a
       `warning` instead of looking like success
-- [ ] no error string or doc line anywhere still instructs the user to configure
+- [x] no error string or doc line anywhere still instructs the user to configure
       `[Gmail]/All Mail` as an archive. `grep -rn 'All Mail' src/ README.md config.example.yml`
       should return only: the glob-literalness examples (`README.md:121`,
       `config.example.yml:8`, the `matches()` docstring at `config.py:109`), the pre-existing
       "Gmail reports the wrong mailbox" trap note at `README.md:177`, the new no-op note, and the
       new refusal messages
-- [ ] no code path emits `delete` or `deleted status`; `test_service_never_emits_a_delete_command`
+- [x] no code path emits `delete` or `deleted status`; `test_service_never_emits_a_delete_command`
       and the rest of the no-deletion suite still pass
-- [ ] no *test execution* reaches a real `osascript`, and this work adds no new subprocess call
+- [x] no *test execution* reaches a real `osascript`, and this work adds no new subprocess call
       site. `applescript.py:45` (`osascript -`) and `applescript.py:64-68` (`open -g -j`) are the
       production runner and must stay exactly as they are
-- [ ] run full test suite: `uv run pytest` — 101 baseline tests plus the new ones, all green
-- [ ] no e2e suite exists in this project — nothing to run
+- [x] run full test suite: `uv run pytest` — 101 baseline tests plus the new ones, all green
+- [x] no e2e suite exists in this project — nothing to run
 
 ### Task 7: [Final] Update documentation
 
