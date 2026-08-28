@@ -1,1 +1,188 @@
-# apple-mail-mcp
+# Apple Mail MCP Server
+
+MCP server for Apple Mail — lets Claude triage your mail: read messages, mark them read,
+flag them, move them between folders, and archive them.
+
+**It cannot delete mail.** There is no delete tool, and Trash and Junk are refused as move
+targets even if you allowlist them.
+
+Built on Mail.app's AppleScript interface, in the shape of
+[apple-reminders-mcp](https://github.com/0xalexb/apple-reminders-mcp) and
+[apple-calendar-mcp](https://github.com/0xalexb/apple-calendar-mcp).
+
+> Requires macOS with Mail.app configured. On first use, macOS will ask you to grant
+> Automation access to Mail.
+
+## Tools
+
+| Tool | Description |
+|------|-------------|
+| `ping` | Health check |
+| `list_mailboxes` | Allowed mailboxes with unread counts and the permissions granted on each |
+| `list_messages` | Messages in one mailbox, with filters and paging |
+| `read_message` | Full headers and body; optionally marks read |
+| `mark_read` / `mark_unread` | Toggle read state |
+| `set_flag` | Set or clear a colour flag |
+| `move_message` | Move to another mailbox |
+| `archive_message` | Move to the account's configured archive mailbox |
+| `flag_colors` | The seven colours Apple Mail supports |
+
+### Filtering is cheap; paging is not
+
+A `whose` clause runs inside Mail and costs about the same on a 3-message mailbox as on a
+3400-message one (~0.4s measured). Reading properties *out* of Mail costs roughly 0.1s per
+message. So narrow with filters rather than paging:
+
+```
+list_messages(account="gmail", mailbox="INBOX", unread_only=true)
+list_messages(account="gmail", mailbox="INBOX", since="2026-08-01", from_contains="@github.com")
+```
+
+Filters: `unread_only`, `flagged_only`, `from_contains`, `subject_contains`, `since`,
+`before` (ISO 8601 dates), plus `limit` (default 25, max 100) and `offset`.
+
+### Handles
+
+`list_messages` returns a handle per message — `gmail/INBOX#127614` — which the other tools
+take. Mail can reassign a message's id when it changes mailbox, so `move_message` and
+`archive_message` re-find the message by its RFC Message-ID and return its **new** handle.
+Use that; the old one may no longer resolve.
+
+## Install
+
+### Homebrew (recommended)
+
+```bash
+brew install 0xalexb/apps/apple-mail-mcp
+```
+
+### uvx (no local install)
+
+```bash
+uvx --from "git+https://github.com/0xalexb/apple-mail-mcp" apple-mail-mcp
+```
+
+### From source
+
+```bash
+git clone https://github.com/0xalexb/apple-mail-mcp.git
+cd apple-mail-mcp
+uv sync
+```
+
+## Configure
+
+### The allowlist
+
+**Every mailbox is denied until you list it.** With no config file the server refuses to do
+anything, by design. Copy `config.example.yml` to
+`~/.config/apple-mail-mcp/config.yml` (or point `APPLE_MAIL_MCP_CONFIG` at it) and edit.
+
+```yaml
+defaults:
+  read: true
+  mark_read: true
+  flag: true
+  move_from: false
+  move_to: false
+
+accounts:
+  - name: gmail
+    id: A1B2C3D4-1234-5678-90AB-CDEF12345678   # optional; survives renaming the account
+    archive_mailbox: "[Gmail]/All Mail"
+    mailboxes:
+      - path: INBOX
+        move_from: true
+      - path: "Filed/*"
+        move_to: true
+```
+
+| Permission | Grants |
+|---|---|
+| `read` | `list_messages`, `read_message` |
+| `mark_read` | `mark_read`, `mark_unread`, `read_message(mark_read=true)` |
+| `flag` | `set_flag` |
+| `move_from` | Messages may **leave** this mailbox |
+| `move_to` | Messages may be **filed into** this mailbox |
+
+Splitting `move_from` from `move_to` is the point: an Inbox you triage *out of* gets
+`move_from`, a filing folder gets `move_to`, and a mailbox with neither is read-only.
+
+Rules are evaluated in order and **the first match wins**.
+
+### Mailbox paths
+
+Paths are **full paths from the account root**, slash-separated, exactly as
+`list_mailboxes` reports them — `Filed/Finance/Statements`, not
+`Finance/Statements`. Mail's own `mailboxes of account` returns a flat list with
+leaf-only names, so nesting is not obvious; ask `list_mailboxes` rather than guessing.
+
+In patterns `*` and `?` are the only wildcards, and `*` spans `/`, so `work/*` covers the
+whole subtree. Square brackets are literal, so Gmail's `[Gmail]/All Mail` works as written.
+
+### Archiving
+
+`archive_mailbox` is per-account and required for `archive_message`, because there is no
+universal answer: iCloud has a real top-level `Archive`, while Gmail accounts have none and
+archive by moving to `[Gmail]/All Mail`.
+
+The archive mailbox does not need `move_to` — naming it as the account's archive is consent
+enough. It does need its own entry with `move_from` if you want to move messages back *out*
+of it; otherwise archiving is one-way.
+
+### MCP client
+
+Claude Code:
+
+```bash
+claude mcp add apple-mail-mcp apple-mail-mcp
+```
+
+Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "apple-mail-mcp": {
+      "command": "apple-mail-mcp"
+    }
+  }
+}
+```
+
+## Development
+
+```bash
+uv sync
+uv run pytest
+uv run ruff check src/ tests/
+uv run apple-mail-mcp
+```
+
+Tests fake the AppleScript runner, so the suite runs on any platform without touching Mail.
+
+## Notes on Apple Mail
+
+Things that cost real time to discover, kept here so they are not rediscovered:
+
+- **Mail quits itself when idle.** Scripts fail with `-600` mid-session; the runner relaunches
+  Mail with `open -g -j` (background, hidden — never `activate`, which steals focus) and
+  retries once.
+- **Never `repeat with m in (messages ... of mb)`.** That re-resolves the whole list
+  expression on every property access: 64s for 20 messages, against 2.6s for the same work
+  after `set msgs to (get messages 1 thru N of mb)` and integer indexing.
+- **Plural property gets fail.** `id of msgs` raises `-1728`; properties must be read per
+  message.
+- **Gmail reports the wrong mailbox.** A message fetched from `mailbox "INBOX"` reports
+  `mailbox of m` as `[Gmail]/All Mail`. Permission checks therefore use the *requested*
+  path, never `mailbox of m`, which would otherwise escape the allowlist.
+- **`&` builds a list, not a string,** unless the left operand is text — and `id of m` is an
+  integer. Concatenations start with `""`.
+- **Every mailbox has class `container`**, and accounts report a subclass such as
+  `imap account`, so walking up `container` stops on `is not container`, not `is account`.
+- **`date "..."` literals are locale-dependent**, so date filters are built by assigning
+  components, resetting `day` to 1 first so setting the month cannot overflow.
+
+## License
+
+MIT
