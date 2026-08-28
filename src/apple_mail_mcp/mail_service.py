@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from apple_mail_mcp.applescript import RS, US, OsascriptRunner, quote
-from apple_mail_mcp.config import Config, is_trash
+from apple_mail_mcp.config import Config, is_all_mail, is_trash
 
 FLAG_COLORS = (
     "red",
@@ -297,6 +297,11 @@ end tell
                 raise ValueError(
                     f"Refusing to archive into '{target_mailbox}'. "
                     "This server does not delete mail."
+                )
+            if is_all_mail(target_mailbox):
+                raise ValueError(
+                    f"Refusing to archive into '{target_mailbox}'. "
+                    "Every message already appears there, so the move would be a no-op."
                 )
         else:
             destination = self._config.require(

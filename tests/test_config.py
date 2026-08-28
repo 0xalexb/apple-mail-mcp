@@ -132,6 +132,34 @@ def test_all_mail_is_never_a_move_source():
         _all_mail_config().require("g", "[Gmail]/All Mail", "move_from")
 
 
+def test_all_mail_archive_mailbox_is_rejected_at_load():
+    with pytest.raises(
+        ValueError, match="is not a folder and the move silently does nothing"
+    ):
+        parse_config(
+            {
+                "accounts": [
+                    {
+                        "name": "g",
+                        "archive_mailbox": "[Gmail]/All Mail",
+                        "mailboxes": ["INBOX"],
+                    }
+                ]
+            }
+        )
+
+
+def test_real_label_archive_mailbox_still_parses():
+    cfg = parse_config(
+        {
+            "accounts": [
+                {"name": "g", "archive_mailbox": "Archive", "mailboxes": ["INBOX"]}
+            ]
+        }
+    )
+    assert cfg.account("g").archive_mailbox == "Archive"
+
+
 def test_account_specifier_prefers_id(config):
     assert 'account id "A1B2C3D4' in config.account("gmail").specifier()
     assert config.account("iCloud").specifier() == 'account "iCloud"'

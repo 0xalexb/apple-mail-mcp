@@ -199,10 +199,18 @@ def _account(entry: dict, defaults: Permissions) -> AccountConfig:
     if not rules:
         raise ValueError(f"Account '{name}' lists no mailboxes, so nothing is allowed")
 
+    archive_mailbox = entry.get("archive_mailbox")
+    if archive_mailbox and is_all_mail(str(archive_mailbox)):
+        raise ValueError(
+            f"Account '{name}' sets archive_mailbox to '{archive_mailbox}'. Gmail "
+            f"archives by moving to a real label such as 'Archive'; "
+            f"'{archive_mailbox}' is not a folder and the move silently does nothing."
+        )
+
     return AccountConfig(
         name=str(name),
         account_id=entry.get("id"),
-        archive_mailbox=entry.get("archive_mailbox"),
+        archive_mailbox=archive_mailbox,
         mailboxes=tuple(rules),
     )
 
