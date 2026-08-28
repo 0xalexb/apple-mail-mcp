@@ -312,6 +312,10 @@ end tell
         # on Gmail: 127608 became 127638), so the id cannot simply be carried
         # over. Re-find the message by its RFC Message-ID, which does not change,
         # inside the same script rather than paying a second round trip.
+        #
+        # `stillThere` must stay outside the try: a target-side lookup failure is
+        # the ordinary sync-lag case, and inside the try it would leave the
+        # variable undefined at the return, failing a move that actually worked.
         script = _PRELUDE + f"""
 tell application "Mail"
 	set mb to mailbox {quote(mailbox)} of {source.specifier()}
@@ -319,15 +323,19 @@ tell application "Mail"
 	set rfc to message id of m
 	set target to mailbox {quote(target_mailbox)} of {destination.specifier()}
 	move m to target
+	set stillThere to (count of (messages of mb whose message id is rfc))
 	set newId to ""
 	try
 		set newId to "" & (id of (first message of target whose message id is rfc))
 	end try
-	return "" & rfc & "{US}" & newId
+	return "" & rfc & "{US}" & newId & "{US}" & stillThere
 end tell
 """
-        rfc, _, new_id = self._run(script).partition(US)
-        new_id = new_id.strip()
+        fields = self._run(script).split(US)
+        if len(fields) < 3:
+            raise RuntimeError(f"Unexpected response moving {handle}")
+        rfc, new_id, still_there = fields[0], fields[1].strip(), fields[2]
+        verified = int(still_there.strip() or 0) == 0
         return {
             "handle": (
                 make_handle(destination.name, target_mailbox, new_id)
@@ -339,6 +347,7 @@ end tell
             "mailbox": target_mailbox,
             "message_id": rfc.strip(),
             "operation": operation,
+            "verified": verified,
             **(
                 {}
                 if new_id
@@ -347,6 +356,19 @@ end tell
                         "The move succeeded, but the message could not be located "
                         "in the target yet, most likely because the account is "
                         "still syncing. Find it again with list_messages."
+                    )
+                }
+            ),
+            **(
+                {}
+                if verified
+                else {
+                    "warning": (
+                        f"The message is still in '{mailbox}' after the move, so it "
+                        "did not leave that mailbox. On Gmail this happens when the "
+                        "target is the label-less All Mail view rather than a real "
+                        "label. It can also mean the account is still syncing — "
+                        "re-check with list_messages before retrying."
                     )
                 }
             ),

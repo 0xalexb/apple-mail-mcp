@@ -281,30 +281,30 @@ four combinations are legal and two of them need tests (see Task 4).
 - Modify: `src/apple_mail_mcp/mail_service.py`
 - Modify: `tests/test_tools_write.py`
 
-- [ ] add the source-side count to the `_move` script **outside** the existing `try` block, per
+- [x] add the source-side count to the `_move` script **outside** the existing `try` block, per
       Technical Details, and return it as a third `US`-separated field
-- [ ] parse three fields strictly; raise `RuntimeError` on a short payload
-- [ ] add `verified: bool` to every `move_message` and `archive_message` result, plus a `warning`
+- [x] parse three fields strictly; raise `RuntimeError` on a short payload
+- [x] add `verified: bool` to every `move_message` and `archive_message` result, plus a `warning`
       key when false; the warning must not use the word "archived", since `_move` serves both
       operations
-- [ ] append the third field to the six canned `FakeRunner` responses in
+- [x] append the third field to the six canned `FakeRunner` responses in
       `tests/test_tools_write.py` — `test_move_returns_the_reassigned_handle`,
       `test_move_reports_when_the_message_cannot_be_relocated`, `test_move_across_accounts`,
       `test_service_never_emits_a_delete_command`, `test_archive_moves_to_the_configured_mailbox`,
       `test_archive_target_need_not_carry_move_to` (lines 91/103/131/156/170/180 as of the
       baseline; Task 2 edits this file, so trust the names over the numbers)
-- [ ] update `test_move_reports_when_the_message_cannot_be_relocated`
+- [x] update `test_move_reports_when_the_message_cannot_be_relocated`
       (`tests/test_tools_write.py:102-106`) — its two-field payload now trips the new strict
       parse, and its meaning becomes `handle is None` + `note` **and** `verified is True`
-- [ ] write test: `verified is True` and no `warning` when the source count is 0
-- [ ] write test: `verified is False` with a `warning` naming the source mailbox when the count
+- [x] write test: `verified is True` and no `warning` when the source count is 0
+- [x] write test: `verified is False` with a `warning` naming the source mailbox when the count
       is non-zero
-- [ ] write test: `note` and `verified: True` coexist (arrived late, but did leave)
-- [ ] write test: `note` and `verified: False` + `warning` coexist (the alarming combination)
-- [ ] write test: the emitted script contains the source-side check and still contains neither
+- [x] write test: `note` and `verified: True` coexist (arrived late, but did leave)
+- [x] write test: `note` and `verified: False` + `warning` coexist (the alarming combination)
+- [x] write test: the emitted script contains the source-side check and still contains neither
       "delete" nor "deleted status"
-- [ ] write test: a two-field payload raises `RuntimeError`
-- [ ] run `uv run pytest` — must pass before task 5
+- [x] write test: a two-field payload raises `RuntimeError`
+- [x] run `uv run pytest` — must pass before task 5
 
 ### Task 5: Correct the documentation and error strings that currently teach the bug
 
