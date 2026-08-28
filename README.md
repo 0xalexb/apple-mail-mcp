@@ -18,7 +18,7 @@ Built on Mail.app's AppleScript interface, in the shape of
 | Tool | Description |
 |------|-------------|
 | `ping` | Health check |
-| `list_mailboxes` | Allowed mailboxes with unread counts and the permissions granted on each |
+| `list_mailboxes` | Allowed mailboxes with unread counts and the permissions usable on each |
 | `list_messages` | Messages in one mailbox, with filters and paging |
 | `read_message` | Full headers and body; optionally marks read |
 | `mark_read` / `mark_unread` | Toggle read state |
@@ -98,6 +98,8 @@ accounts:
     mailboxes:
       - path: INBOX
         move_from: true
+      - path: Archive          # the archive target needs no rule; list it to read it
+        move_from: true
       - path: "Filed/*"
         move_to: true
 ```
@@ -131,16 +133,24 @@ whole subtree. Square brackets are literal, so Gmail's `[Gmail]/All Mail` works 
 universal answer: iCloud has a real top-level `Archive`, and a Gmail account needs a real
 label — `Archive` if it has one, otherwise create one in Gmail's own interface.
 
-`[Gmail]/All Mail` is not a folder and is refused, as a source and as a target. It is
-Gmail's label-less view of every message, inbox included, so moving into it is a self-move
-that silently does nothing, and a message never leaves it. A config naming it as
-`archive_mailbox` fails to load; a mailbox rule granting it `move_from` or `move_to` loads
-but raises on the first move against it.
+Any mailbox whose last path segment is `All Mail` — `[Gmail]/All Mail` and its equivalent in
+any other account, matched case- and whitespace-insensitively — is refused, as a source and as
+a target. It is Gmail's label-less view of every message, inbox included, so moving into it is
+a self-move that silently does nothing, and a message never leaves it. A config naming it as
+`archive_mailbox` fails to load; a mailbox rule granting it `move_from` or `move_to` loads but
+raises on the first move against it. Trash and Junk are likewise refused as archive targets,
+at load and at call time.
+
+> **Breaking, if you are upgrading.** Two configs that used to work now do not. A config with
+> `archive_mailbox: "[Gmail]/All Mail"` (or a Trash mailbox) **no longer loads** — the server
+> refuses to start until it names a real label. And a mailbox rule granting `move_from` or
+> `move_to` on an All Mail path still loads, but the first move against it raises. Both were
+> previously accepted and silently did nothing.
 
 The archive mailbox does not need `move_to` — naming it as the account's archive is consent
 enough. It does need its own entry with `move_from` if you want to move messages back *out*
-of it; otherwise archiving is one-way. All Mail is the one archive target that cannot be
-given `move_from`, because it is refused as a source outright.
+of it; otherwise archiving is one-way. This does not apply to All Mail: it cannot be an
+archive target in the first place, and it is refused as a source outright.
 
 ### MCP client
 
@@ -192,6 +202,9 @@ Things that cost real time to discover, kept here so they are not rediscovered:
   label, so Mail sees a self-move, does nothing, and raises no error; the message is still
   in the INBOX afterwards. There is no scriptable Archive command either — `Mail.sdef`
   contains no "archive" — so the only way to archive on Gmail is to move to a real label.
+  The static refusal matches the English leaf name only: a localized account names it
+  `[Gmail]/Alle Nachrichten` or similar and slips past it, which is why every move also
+  counts the message in the source afterwards and reports `verified`.
 - **`&` builds a list, not a string,** unless the left operand is text — and `id of m` is an
   integer. Concatenations start with `""`.
 - **Every mailbox has class `container`**, and accounts report a subclass such as

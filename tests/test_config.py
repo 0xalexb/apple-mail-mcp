@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import pytest
 
-from apple_mail_mcp.config import is_all_mail, is_trash, load_config, parse_config
+from apple_mail_mcp.config import (
+    Permissions,
+    advertised_permissions,
+    is_all_mail,
+    is_trash,
+    load_config,
+    parse_config,
+)
 
 
 def test_account_lookup_by_name_and_id(config):
@@ -123,12 +130,12 @@ def _all_mail_config():
 
 
 def test_all_mail_is_never_a_move_target():
-    with pytest.raises(ValueError, match="Refusing to move messages into"):
+    with pytest.raises(ValueError, match="label-less view.+Use a real label"):
         _all_mail_config().require("g", "[Gmail]/All Mail", "move_to")
 
 
 def test_all_mail_is_never_a_move_source():
-    with pytest.raises(ValueError, match="Refusing to move messages out of"):
+    with pytest.raises(ValueError, match="a message never leaves it"):
         _all_mail_config().require("g", "[Gmail]/All Mail", "move_from")
 
 
@@ -147,6 +154,32 @@ def test_all_mail_archive_mailbox_is_rejected_at_load():
                 ]
             }
         )
+
+
+def test_trash_archive_mailbox_is_rejected_at_load():
+    with pytest.raises(ValueError, match="Archiving is not deletion"):
+        parse_config(
+            {
+                "accounts": [
+                    {
+                        "name": "g",
+                        "archive_mailbox": "[Gmail]/Trash",
+                        "mailboxes": ["INBOX"],
+                    }
+                ]
+            }
+        )
+
+
+def test_advertised_permissions_mask_what_require_refuses():
+    granted = Permissions(move_from=True, move_to=True)
+    all_mail = advertised_permissions("[Gmail]/All Mail", granted)
+    assert (all_mail.move_from, all_mail.move_to) == (False, False)
+
+    trash = advertised_permissions("[Gmail]/Trash", granted)
+    assert (trash.move_from, trash.move_to) == (True, False)
+
+    assert advertised_permissions("Archive", granted) == granted
 
 
 def test_real_label_archive_mailbox_still_parses():

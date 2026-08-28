@@ -26,9 +26,15 @@ accounts:
     # Required for archive_message. Must be a real mailbox: on Gmail an actual
     # label, never "[Gmail]/All Mail", which is the label-less view of every
     # message and is refused at load because moving into it does nothing.
+    # Allowlisting an All Mail path below is refused too, but only when a move
+    # runs: the config still loads clean and the first move against it raises.
     archive_mailbox: Archive
     mailboxes:
       - path: INBOX
+        move_from: true
+      # The archive target needs no move_to, but list it to make it readable
+      # and to allow moving messages back out of it.
+      - path: Archive
         move_from: true
       - path: "Filed/*"
         move_to: true

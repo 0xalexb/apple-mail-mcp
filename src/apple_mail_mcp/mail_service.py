@@ -3,7 +3,12 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from apple_mail_mcp.applescript import RS, US, OsascriptRunner, quote
-from apple_mail_mcp.config import Config, is_all_mail, is_trash
+from apple_mail_mcp.config import (
+    Config,
+    advertised_permissions,
+    is_all_mail,
+    is_trash,
+)
 
 FLAG_COLORS = (
     "red",
@@ -84,7 +89,9 @@ end tell
                         "mailbox": path,
                         "unread_count": int(unread),
                         "is_archive": path == account.archive_mailbox,
-                        "permissions": permissions.as_dict(),
+                        "permissions": advertised_permissions(
+                            path, permissions
+                        ).as_dict(),
                     }
                 )
         return rows
@@ -292,7 +299,8 @@ end tell
 
         if operation == "archive":
             # The archive target is named by the account's own config, so it is
-            # trusted for move_to; it still must not be a Trash mailbox.
+            # trusted for move_to. `parse_config` rejects both of these targets at
+            # load; the guards here cover a Config assembled without it.
             destination = self._config.account(destination_key)
             if is_trash(target_mailbox):
                 raise ValueError(
@@ -314,17 +322,21 @@ end tell
         # over. Re-find the message by its RFC Message-ID, which does not change,
         # inside the same script rather than paying a second round trip.
         #
-        # `stillThere` must stay outside the try: a target-side lookup failure is
-        # the ordinary sync-lag case, and inside the try it would leave the
-        # variable undefined at the return, failing a move that actually worked.
+        # Nothing after `move m to target` may abort the script: the runner
+        # retries the whole thing on -600, which would re-run the move. So the
+        # source-side count gets its own try, and `stillThere` is pre-set to the
+        # -1 sentinel beforehand so it is defined at the return either way.
         script = _PRELUDE + f"""
 tell application "Mail"
 	set mb to mailbox {quote(mailbox)} of {source.specifier()}
 	set m to first message of mb whose id is {message_id}
 	set rfc to message id of m
 	set target to mailbox {quote(target_mailbox)} of {destination.specifier()}
+	set stillThere to -1
 	move m to target
-	set stillThere to (count of (messages of mb whose message id is rfc))
+	try
+		set stillThere to (count of (messages of mb whose message id is rfc))
+	end try
 	set newId to ""
 	try
 		set newId to "" & (id of (first message of target whose message id is rfc))
@@ -333,11 +345,13 @@ tell application "Mail"
 end tell
 """
         fields = self._run(script).split(US)
-        if len(fields) < 3:
+        if len(fields) != 3:
             raise RuntimeError(f"Unexpected response moving {handle}")
-        rfc, new_id, still_there = fields[0], fields[1].strip(), fields[2]
-        verified = int(still_there.strip() or 0) == 0
-        return {
+        rfc, new_id = fields[0], fields[1].strip()
+        still_there = _as_count(fields[2])
+        verified = still_there == 0
+
+        result = {
             "handle": (
                 make_handle(destination.name, target_mailbox, new_id)
                 if new_id
@@ -349,31 +363,28 @@ end tell
             "message_id": rfc.strip(),
             "operation": operation,
             "verified": verified,
-            **(
-                {}
-                if new_id
-                else {
-                    "note": (
-                        "The move succeeded, but the message could not be located "
-                        "in the target yet, most likely because the account is "
-                        "still syncing. Find it again with list_messages."
-                    )
-                }
-            ),
-            **(
-                {}
-                if verified
-                else {
-                    "warning": (
-                        f"The message is still in '{mailbox}' after the move, so it "
-                        "did not leave that mailbox. On Gmail this happens when the "
-                        "target is the label-less All Mail view rather than a real "
-                        "label. It can also mean the account is still syncing — "
-                        "re-check with list_messages before retrying."
-                    )
-                }
-            ),
         }
+        if not new_id:
+            result["note"] = (
+                "The move command completed, but the message could not be located "
+                "in the target yet, most likely because the account is still "
+                "syncing. Find it again with list_messages."
+            )
+        if still_there < 0:
+            result["warning"] = (
+                f"Mail did not report whether the message left '{mailbox}', so the "
+                "move is unconfirmed. Check with list_messages before retrying."
+            )
+        elif not verified:
+            result["warning"] = (
+                f"The message is still in '{mailbox}' after the move, so it did not "
+                "leave that mailbox. On Gmail this happens when the target is the "
+                "label-less All Mail view rather than a real label. It can also mean "
+                "the account is still syncing, or that a second copy carrying the "
+                "same Message-ID remains there — re-check with list_messages before "
+                "retrying."
+            )
+        return result
 
 
 # -- handles ---------------------------------------------------------------
@@ -413,6 +424,18 @@ def _records(payload: str) -> list[list[str]]:
 
 def _as_bool(value: str) -> bool:
     return value.strip().lower() == "true"
+
+
+def _as_count(value: str) -> int:
+    """A source-side count, or -1 when Mail reported none.
+
+    Blank or garbled must never read as zero: zero is what marks a move verified,
+    and this field exists to keep an unproven move from looking like a proven one.
+    """
+    try:
+        return int(value.strip())
+    except ValueError:
+        return -1
 
 
 def _flag_color(value: str) -> str | None:

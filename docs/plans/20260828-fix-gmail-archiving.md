@@ -150,12 +150,15 @@ def is_all_mail(path: str) -> bool:
     return path.rsplit("/", 1)[-1].strip().lower() in _ALL_MAIL_LEAVES
 ```
 
-**Script fragment** (`_move`). The placement is load-bearing — `set stillThere` goes **outside**
-the existing `try`, between `move m to target` and `set newId to ""`:
+**Script fragment** (`_move`). The placement is load-bearing — `set stillThere to -1` goes
+**before** `move m to target`, and the count itself gets its **own** `try`:
 
 ```applescript
+set stillThere to -1
 move m to target
-set stillThere to (count of (messages of mb whose message id is rfc))
+try
+	set stillThere to (count of (messages of mb whose message id is rfc))
+end try
 set newId to ""
 try
 	set newId to "" & (id of (first message of target whose message id is rfc))
@@ -163,10 +166,19 @@ end try
 return "" & rfc & "<US>" & newId & "<US>" & stillThere
 ```
 
-Inside the `try`, a target-side lookup failure — precisely the sync-lag case the existing `note`
-exists for — would skip the assignment and leave `stillThere` undefined at the `return`, turning
-a successful move into an `AppleScriptError`. That failure only reproduces against a live
-account, which this plan cannot test, so it has to be prevented by construction.
+⚠️ Revised during review. The original shape put the count outside any `try`, on the reasoning
+that inside the *existing* try it would be skipped and leave `stillThere` undefined at the
+`return`. That much is true, but bare outside the try it becomes an unguarded statement **after**
+the mutation: any failure of it (an AppleEvent timeout scanning a large INBOX, a `-600`) aborts
+the whole script, so a move that already succeeded is reported as an error — and
+`OsascriptRunner` retries the entire script on `-600`, re-running `move m to target`. The
+sentinel satisfies both constraints: pre-initialising before the move keeps the variable defined
+at the `return` whatever the count does, and its own `try` keeps a post-mutation failure from
+aborting. `-1` reaches the caller as `verified: false` with a warning saying the departure could
+not be checked.
+
+Note that the *existing* try is needed because `first message ... whose` raises on an empty
+result; `count` does not raise, so its try guards only the AppleEvent-level failures above.
 
 `mb` stays valid after the move. `whose` filters inside Mail — the repo's own performance note
 says that costs about the same on a 3400-message mailbox as on a 3-message one. Never iterate
@@ -178,11 +190,16 @@ operand is text.
 
 ```python
 fields = self._run(script).split(US)
-if len(fields) < 3:
+if len(fields) != 3:
     raise RuntimeError(f"Unexpected response moving {handle}")
-rfc, new_id, still_there = fields[0], fields[1].strip(), fields[2]
-verified = int(still_there.strip() or 0) == 0
+rfc, new_id = fields[0], fields[1].strip()
+still_there = _as_count(fields[2])   # blank or garbled -> -1, never 0
+verified = still_there == 0
 ```
+
+Fails **closed**: zero is what marks a move verified, so a missing or unparseable count must not
+produce one. `_as_count` returning `-1` rather than raising keeps a garbled field from being
+reported as a `ValueError`, which in this project's taxonomy means "invalid input".
 
 **Warning text** when `verified` is false:
 
@@ -281,8 +298,9 @@ four combinations are legal and two of them need tests (see Task 4).
 - Modify: `src/apple_mail_mcp/mail_service.py`
 - Modify: `tests/test_tools_write.py`
 
-- [x] add the source-side count to the `_move` script **outside** the existing `try` block, per
-      Technical Details, and return it as a third `US`-separated field
+- [x] add the source-side count to the `_move` script per Technical Details — `stillThere`
+      pre-set to `-1` before the move, the count in its own `try` after it — and return it as a
+      third `US`-separated field
 - [x] parse three fields strictly; raise `RuntimeError` on a short payload
 - [x] add `verified: bool` to every `move_message` and `archive_message` result, plus a `warning`
       key when false; the warning must not use the word "archived", since `_move` serves both
@@ -372,6 +390,8 @@ four combinations are legal and two of them need tests (see Task 4).
       An invariant, not a pattern write-up — without it a future reader sees only the Trash rule
       and reads the All Mail refusal as an unexplained oddity to relax
 - [x] move this plan to `docs/plans/completed/`
+      ⚠️ deliberately still in `docs/plans/`: the harness moves it after the review
+      phases finish, which need to read it. Do not "fix" this by moving the file.
 
 ## Post-Completion
 

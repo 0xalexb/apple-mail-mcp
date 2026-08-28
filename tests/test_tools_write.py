@@ -134,19 +134,33 @@ def test_move_can_be_unverified_and_missing_from_the_target(config, fake_runner)
     assert "INBOX" in result["warning"]
 
 
-def test_move_raises_on_a_short_payload(config, fake_runner):
-    svc, _ = service(config, fake_runner, f"<a@b>{US}9")
+@pytest.mark.parametrize("payload", [f"<a@b>{US}9", f"<a@b>{US}9{US}0{US}extra"])
+def test_move_raises_on_a_malformed_payload(config, fake_runner, payload):
+    svc, _ = service(config, fake_runner, payload)
     with pytest.raises(RuntimeError, match="Unexpected response moving"):
         svc.move_message("gmail/INBOX#1", "Filed/x")
 
 
-def test_the_source_side_check_sits_outside_the_try(config, fake_runner):
+@pytest.mark.parametrize("count", ["", "   ", "not a number"])
+def test_a_missing_source_count_is_never_read_as_success(config, fake_runner, count):
+    svc, _ = service(config, fake_runner, f"<a@b>{US}9{US}{count}")
+    result = svc.move_message("gmail/INBOX#1", "Filed/x")
+    assert result["verified"] is False
+    assert "did not report whether the message left 'INBOX'" in result["warning"]
+
+
+def test_nothing_after_the_move_can_abort_the_script(config, fake_runner):
+    """A statement that can fail after `move` turns a done move into an error,
+    and the runner retries the whole script on -600, moving twice."""
     svc, runner = service(config, fake_runner, f"<a@b>{US}9{US}0")
     svc.move_message("gmail/INBOX#1", "Filed/x")
     lines = [line.strip() for line in runner.script.splitlines()]
     body = lines[lines.index("move m to target") :]
     check = "set stillThere to (count of (messages of mb whose message id is rfc))"
-    assert body.index(check) < body.index("try")
+
+    assert "set stillThere to -1" in lines[: lines.index("move m to target")]
+    assert body[body.index(check) - 1] == "try"
+    assert body[body.index(check) + 1] == "end try"
 
 
 def test_move_requires_move_from_on_the_source(config, fake_runner):
@@ -206,13 +220,44 @@ def test_service_never_emits_a_delete_command(config, fake_runner):
         assert "deleted status" not in script.lower()
 
 
-def test_the_source_side_check_emits_no_delete_command(config, fake_runner):
-    svc, runner = service(config, fake_runner, f"<a@b>{US}2{US}0")
-    svc.move_message("gmail/INBOX#1", "Filed/x")
+# -- the label-less view ---------------------------------------------------
 
-    assert "count of (messages of mb whose message id is rfc)" in runner.script
-    assert "delete" not in runner.script.lower()
-    assert "deleted status" not in runner.script.lower()
+
+def _all_mail_service(fake_runner):
+    from apple_mail_mcp.config import parse_config
+
+    cfg = parse_config(
+        {
+            "accounts": [
+                {
+                    "name": "g",
+                    "mailboxes": [
+                        {"path": "INBOX", "move_from": True},
+                        {
+                            "path": "[Gmail]/All Mail",
+                            "move_from": True,
+                            "move_to": True,
+                        },
+                    ],
+                }
+            ]
+        }
+    )
+    return service(cfg, fake_runner)
+
+
+def test_move_into_all_mail_is_refused_even_when_allowlisted(fake_runner):
+    svc, runner = _all_mail_service(fake_runner)
+    with pytest.raises(ValueError, match="Use a real label"):
+        svc.move_message("g/INBOX#1", "[Gmail]/All Mail")
+    assert runner.scripts == []
+
+
+def test_move_out_of_all_mail_is_refused_even_when_allowlisted(fake_runner):
+    svc, runner = _all_mail_service(fake_runner)
+    with pytest.raises(ValueError, match="a message never leaves it"):
+        svc.move_message("g/[Gmail]/All Mail#1", "INBOX")
+    assert runner.scripts == []
 
 
 # -- archiving -------------------------------------------------------------
@@ -264,43 +309,41 @@ def test_archiving_an_archived_message_is_rejected(config, fake_runner):
         svc.archive_message("a/Archive#1")
 
 
-def test_archive_into_trash_is_refused(fake_runner):
-    from apple_mail_mcp.config import parse_config
+def test_archive_reports_an_unverified_archive_as_unverified(config, fake_runner):
+    svc, _ = service(config, fake_runner, f"<a@b>{US}200{US}1")
+    result = svc.archive_message("gmail/INBOX#127614")
 
-    cfg = parse_config(
-        {
-            "accounts": [
-                {
-                    "name": "a",
-                    "archive_mailbox": "Trash",
-                    "mailboxes": [{"path": "INBOX", "move_from": True}],
-                }
-            ]
-        }
+    assert result["verified"] is False
+    assert "INBOX" in result["warning"]
+    assert "archived" not in result["warning"]
+
+
+def _hand_built_config(archive_mailbox):
+    """A Config that never went through parse_config, which rejects both targets
+    at load. Only such a config can reach the archive-branch guards at all."""
+    from apple_mail_mcp.config import AccountConfig, Config, MailboxRule, Permissions
+
+    return Config(
+        accounts=(
+            AccountConfig(
+                name="a",
+                account_id=None,
+                archive_mailbox=archive_mailbox,
+                mailboxes=(MailboxRule("INBOX", Permissions(move_from=True)),),
+            ),
+        )
     )
-    svc, runner = service(cfg, fake_runner)
+
+
+def test_archive_into_trash_is_refused(fake_runner):
+    svc, runner = service(_hand_built_config("Trash"), fake_runner)
     with pytest.raises(ValueError, match="does not delete mail"):
         svc.archive_message("a/INBOX#1")
     assert runner.scripts == []
 
 
 def test_archive_into_all_mail_is_refused(fake_runner):
-    from apple_mail_mcp.config import AccountConfig, Config, MailboxRule, Permissions
-
-    # Built by hand rather than through parse_config: parse_config now rejects an
-    # All Mail archive_mailbox outright, so routing through it would exercise the
-    # load-time guard and never reach the archive branch this test is about.
-    cfg = Config(
-        accounts=(
-            AccountConfig(
-                name="a",
-                account_id=None,
-                archive_mailbox="[Gmail]/All Mail",
-                mailboxes=(MailboxRule("INBOX", Permissions(move_from=True)),),
-            ),
-        )
-    )
-    svc, runner = service(cfg, fake_runner)
+    svc, runner = service(_hand_built_config("[Gmail]/All Mail"), fake_runner)
     with pytest.raises(ValueError, match="the move would be a no-op"):
         svc.archive_message("a/INBOX#1")
     assert runner.scripts == []
