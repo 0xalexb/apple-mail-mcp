@@ -147,9 +147,12 @@ with nowhere to go. Instead the move is attempted and the result reports `verifi
 no-op is visible rather than reported as success. Trash and Junk remain refused as archive
 targets: archiving is not deletion.
 
-> **If you archive to `[Gmail]/All Mail`, check `verified`.** On some Gmail accounts the move
-> is a no-op and the message stays in the INBOX. `verified: false` is the server telling you
-> that happened. Archive one message and read the result before running a batch.
+> **Gmail archiving does not work, and this server will tell you so.** Apple Mail's scriptable
+> `move` does not clear Gmail's INBOX label — a long-standing Mail bug. The message is removed
+> locally and the server restores it seconds later under a new id, so it never leaves the
+> INBOX. `archive_message` attempts the move, waits, re-checks, and returns `verified: false`
+> with an explanation. It does not pretend. Archiving Gmail mail requires Gmail's own web
+> interface, a Gmail filter, or Mail's GUI Archive command — none of which are scriptable.
 
 The archive mailbox does not need `move_to` — naming it as the account's archive is consent
 enough for `archive_message`, though the example grants it so `move_message` can file into it
@@ -206,8 +209,9 @@ Things that cost real time to discover, kept here so they are not rediscovered:
   label, so Mail sees a self-move, does nothing, and raises no error; the message is still
   in the INBOX afterwards. There is no scriptable Archive command either — `Mail.sdef`
   contains no "archive" — and Apple Mail still designates it as the Archive Mailbox for
-  Gmail accounts, so the server attempts the move and reports `verified` rather than
-  refusing a target the account may have no alternative to. A localized account names it
+  Gmail accounts. Worse, the removal *looks* like it worked: a count taken in the same
+  round trip as the move reads zero, and the message reappears moments later. `verified`
+  therefore re-checks after a settle, which is the only way to catch it. A localized account names it
   `[Gmail]/Alle Nachrichten` or similar and slips past it, which is why every move also
   counts the message in the source afterwards and reports `verified`.
 - **`&` builds a list, not a string,** unless the left operand is text — and `id of m` is an
