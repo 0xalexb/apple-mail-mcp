@@ -40,6 +40,12 @@ There is no delete tool and no code path sets `deleted status`. Trash and Junk m
 refused as move targets even when allowlisted. `test_tools_write.py` asserts all of this;
 keep those tests passing.
 
+## All Mail is refused
+
+`[Gmail]/All Mail` is Gmail's label-less view, not a mailbox: it is refused as a move source and
+as a move target even when allowlisted, and as an `archive_mailbox` at config load.
+`test_config.py` and `test_tools_write.py` assert this; keep those tests passing.
+
 ## AppleScript traps
 
 See the "Notes on Apple Mail" section of README.md before touching `mail_service.py`. The
