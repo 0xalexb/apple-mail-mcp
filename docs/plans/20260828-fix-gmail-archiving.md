@@ -365,13 +365,13 @@ four combinations are legal and two of them need tests (see Task 4).
 
 ### Task 7: [Final] Update documentation
 
-- [ ] README.md updated (covered in Task 5 — confirm nothing was missed)
-- [ ] add one or two lines to CLAUDE.md beside "Deletion is out of scope" (lines 37-41) recording
+- [x] README.md updated (covered in Task 5 — confirm nothing was missed)
+- [x] add one or two lines to CLAUDE.md beside "Deletion is out of scope" (lines 37-41) recording
       the All Mail refusal as a project invariant, exactly parallel to how the Trash refusal is
       recorded there: refused as source and target even when allowlisted, asserted by tests.
       An invariant, not a pattern write-up — without it a future reader sees only the Trash rule
       and reads the All Mail refusal as an unexplained oddity to relax
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 
