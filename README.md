@@ -49,8 +49,13 @@ take. Mail can reassign a message's id when it changes mailbox, so `move_message
 Use that; the old one may no longer resolve.
 
 Arriving in the target is only half of a move. Both tools also count the message in the
-*source* mailbox afterwards and report `verified`: `true` means it is gone from where it
-started, `false` means it is still there and the result carries a `warning` instead of
+*source* mailbox afterwards and report `verified`. `true` means Mail reported the message
+gone from the source at the time of the move. That count runs in the same AppleScript round
+trip as the move, so it is Mail's local view at that instant, not proof the mail server kept
+the change: an IMAP expunge the server later rejects, or the message being re-downloaded into
+the source afterwards, cannot be seen from that one round trip. `false` means one of two
+different things — the message was still in the source, or Mail reported no count at all and
+the move is merely unconfirmed — and the result carries a `warning` saying which, instead of
 looking like success.
 
 ## Install
@@ -98,8 +103,9 @@ accounts:
     mailboxes:
       - path: INBOX
         move_from: true
-      - path: Archive          # the archive target needs no rule; list it to read it
-        move_from: true
+      - path: Archive          # the archive target needs no rule; list it to read it,
+        move_from: true        # to file into it, and to move messages back out
+        move_to: true
       - path: "Filed/*"
         move_to: true
 ```
@@ -148,8 +154,9 @@ at load and at call time.
 > previously accepted and silently did nothing.
 
 The archive mailbox does not need `move_to` — naming it as the account's archive is consent
-enough. It does need its own entry with `move_from` if you want to move messages back *out*
-of it; otherwise archiving is one-way. This does not apply to All Mail: it cannot be an
+enough for `archive_message`, though the example grants it so `move_message` can file into it
+too. It does need its own entry with `move_from` if you want to move messages back *out* of
+it; otherwise archiving is one-way. This does not apply to All Mail: it cannot be an
 archive target in the first place, and it is refused as a source outright.
 
 ### MCP client

@@ -90,13 +90,13 @@ def set_flag(handle: str, color: str | None = None) -> dict:
 def move_message(
     handle: str, target_mailbox: str, target_account: str | None = None
 ) -> dict:
-    """Moves a message to another mailbox. Requires move_from on the source and move_to on the target. target_account defaults to the message's own account. Returns the message's new handle. Trash and Junk mailboxes are refused: this server never deletes mail. The result carries verified: true only when the message is confirmed gone from the source mailbox; verified: false means it is still there and comes with a warning explaining why."""
+    """Moves a message to another mailbox. Requires move_from on the source and move_to on the target. target_account defaults to the message's own account. Returns the message's new handle. Trash and Junk mailboxes are refused: this server never deletes mail. verified: true means Mail reported the message gone from the source mailbox at the time of the move - a check made in the same round trip, so it is Mail's local view and not proof the mail server kept the change. verified: false covers two different states: the message is still in the source, or Mail did not report a count at all and the move is merely unconfirmed. Read the warning to tell them apart rather than assuming the move failed, and re-check with list_messages instead of retrying, because a retry raises once the message has left."""
     return _get_service().move_message(handle, target_mailbox, target_account)
 
 
 @mcp.tool()
 def archive_message(handle: str) -> dict:
-    """Moves a message to its account's configured archive mailbox. Returns the message's new handle. The result carries verified: true only when the message is confirmed gone from the source mailbox; verified: false means the archive did not take effect and comes with a warning explaining why. Do not report an unverified result as archived."""
+    """Moves a message to its account's configured archive mailbox. Returns the message's new handle. verified: true means Mail reported the message gone from the source mailbox at the time of the move - a check made in the same round trip, so it is Mail's local view and not proof the mail server kept the change. verified: false covers two different states: the message is still in the source, so the archive did not take effect, or Mail did not report a count at all, so the archive is unconfirmed and may well have worked. Read the warning to tell them apart. Do not report an unverified result as archived, and do not retry one - re-check with list_messages, because a retry raises once the message has left."""
     return _get_service().archive_message(handle)
 
 
