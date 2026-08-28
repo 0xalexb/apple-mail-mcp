@@ -91,3 +91,11 @@ def test_every_tool_has_a_docstring():
     ]
     for tool in tools:
         assert tool.__doc__, f"{tool.__name__} needs a docstring for the tool schema"
+
+
+def test_move_tools_document_verified():
+    for tool in (server.move_message, server.archive_message):
+        assert "verified" in tool.__doc__, (
+            f"{tool.__name__} must document the verified key: it is all a calling "
+            "agent reads before deciding the move worked"
+        )

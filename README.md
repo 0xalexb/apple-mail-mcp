@@ -23,8 +23,8 @@ Built on Mail.app's AppleScript interface, in the shape of
 | `read_message` | Full headers and body; optionally marks read |
 | `mark_read` / `mark_unread` | Toggle read state |
 | `set_flag` | Set or clear a colour flag |
-| `move_message` | Move to another mailbox |
-| `archive_message` | Move to the account's configured archive mailbox |
+| `move_message` | Move to another mailbox; reports `verified` |
+| `archive_message` | Move to the account's configured archive mailbox; reports `verified` |
 | `flag_colors` | The seven colours Apple Mail supports |
 
 ### Filtering is cheap; paging is not
@@ -47,6 +47,11 @@ Filters: `unread_only`, `flagged_only`, `from_contains`, `subject_contains`, `si
 take. Mail can reassign a message's id when it changes mailbox, so `move_message` and
 `archive_message` re-find the message by its RFC Message-ID and return its **new** handle.
 Use that; the old one may no longer resolve.
+
+Arriving in the target is only half of a move. Both tools also count the message in the
+*source* mailbox afterwards and report `verified`: `true` means it is gone from where it
+started, `false` means it is still there and the result carries a `warning` instead of
+looking like success.
 
 ## Install
 
@@ -89,7 +94,7 @@ defaults:
 accounts:
   - name: gmail
     id: A1B2C3D4-1234-5678-90AB-CDEF12345678   # optional; survives renaming the account
-    archive_mailbox: "[Gmail]/All Mail"
+    archive_mailbox: Archive
     mailboxes:
       - path: INBOX
         move_from: true
@@ -123,12 +128,19 @@ whole subtree. Square brackets are literal, so Gmail's `[Gmail]/All Mail` works 
 ### Archiving
 
 `archive_mailbox` is per-account and required for `archive_message`, because there is no
-universal answer: iCloud has a real top-level `Archive`, while Gmail accounts have none and
-archive by moving to `[Gmail]/All Mail`.
+universal answer: iCloud has a real top-level `Archive`, and a Gmail account needs a real
+label — `Archive` if it has one, otherwise create one in Gmail's own interface.
+
+`[Gmail]/All Mail` is not a folder and is refused, as a source and as a target. It is
+Gmail's label-less view of every message, inbox included, so moving into it is a self-move
+that silently does nothing, and a message never leaves it. A config naming it as
+`archive_mailbox` fails to load; a mailbox rule granting it `move_from` or `move_to` loads
+but raises on the first move against it.
 
 The archive mailbox does not need `move_to` — naming it as the account's archive is consent
 enough. It does need its own entry with `move_from` if you want to move messages back *out*
-of it; otherwise archiving is one-way.
+of it; otherwise archiving is one-way. All Mail is the one archive target that cannot be
+given `move_from`, because it is refused as a source outright.
 
 ### MCP client
 
@@ -176,6 +188,10 @@ Things that cost real time to discover, kept here so they are not rediscovered:
 - **Gmail reports the wrong mailbox.** A message fetched from `mailbox "INBOX"` reports
   `mailbox of m` as `[Gmail]/All Mail`. Permission checks therefore use the *requested*
   path, never `mailbox of m`, which would otherwise escape the allowlist.
+- **Moving to `[Gmail]/All Mail` is a no-op that reports success.** It is a view, not a
+  label, so Mail sees a self-move, does nothing, and raises no error; the message is still
+  in the INBOX afterwards. There is no scriptable Archive command either — `Mail.sdef`
+  contains no "archive" — so the only way to archive on Gmail is to move to a real label.
 - **`&` builds a list, not a string,** unless the left operand is text — and `id of m` is an
   integer. Concatenations start with `""`.
 - **Every mailbox has class `container`**, and accounts report a subclass such as
