@@ -284,8 +284,9 @@ end tell
         if not account.archive_mailbox:
             raise ValueError(
                 f"Account '{account.name}' has no 'archive_mailbox' configured. "
-                "Name a real mailbox, such as 'Archive'; on Gmail it must be an "
-                "actual label, not the label-less All Mail view."
+                "Name a real mailbox, such as 'Archive'. On Gmail, leave it unset "
+                "and archive with a server-side filter instead: Apple Mail cannot "
+                "clear the INBOX label from AppleScript."
             )
         if mailbox == account.archive_mailbox:
             raise ValueError(f"Message is already in '{account.archive_mailbox}'")
