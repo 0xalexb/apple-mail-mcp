@@ -159,6 +159,29 @@ enough for `archive_message`, though the example grants it so `move_message` can
 too. It does need its own entry with `move_from` if you want to move messages back *out* of
 it; otherwise archiving is one-way.
 
+### On Gmail, let Gmail do the filing
+
+The bug is narrow: AppleScript has no way to say *remove one label*. Everything else this
+server does on a Gmail account works, because it rests on real IMAP flags that sync. So split
+the work rather than fighting it:
+
+| Job | Owner |
+| --- | --- |
+| Archive, label, skip the inbox | Gmail's own filters, server-side |
+| List, read, mark read/unread, flag | This server |
+
+Set the filing up once in Gmail (Settings → Filters and Blocked Addresses → Create a new
+filter) with **Skip the Inbox (Archive it)** and **Apply the label**, and the inbox stays
+organised without a `move` ever being attempted. This server then does triage only: find the
+mail, read it, mark it, flag it.
+
+Configure such an account by simply leaving `archive_mailbox` unset — `archive_message` then
+refuses with a clear error instead of attempting a move that cannot work.
+
+One caveat on flags: only the red flag (index 0) is the IMAP `\Flagged` flag, which Gmail
+shows as a star. The other six colours are Apple-private IMAP keywords — Gmail stores them
+faithfully but does not display them.
+
 ### MCP client
 
 Claude Code:

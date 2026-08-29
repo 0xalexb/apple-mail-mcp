@@ -58,6 +58,13 @@ scripting (rejected: needs Accessibility, steals focus, breaks on menu renames).
 implemented. Only Trash and Junk are refused as targets; All Mail is attempted and reported on
 honestly.
 
+**The resolution is to not archive from here at all.** Gmail accounts do their filing with
+server-side filters; this server is a triage client for them — list, read, mark read/unread,
+flag, all of which ride real IMAP flags and sync correctly. Do not add an IMAP or Gmail-API
+backend to work around the `move` bug without asking: it would make a single-transport
+AppleScript server into a two-backend one, and reusing Mail's own OAuth token (issued to
+Apple's client ID) is not an option.
+
 ## AppleScript traps
 
 See the "Notes on Apple Mail" section of README.md before touching `mail_service.py`. The
