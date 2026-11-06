@@ -25,10 +25,23 @@ def test_handle_keeps_bracketed_mailbox_paths():
     assert parse_handle(handle) == ("gmail", "[Gmail]/All Mail", 7)
 
 
-@pytest.mark.parametrize("bad", ["no-hash", "acct#12", "acct/mbox#abc", "/mbox#1"])
+@pytest.mark.parametrize(
+    "bad", ["no-hash", "acct#12", "acct/mbox#abc", "/mbox#1", "acct/mbox#-1", "acct/mbox#-1743"]
+)
 def test_malformed_handles_are_rejected(bad):
     with pytest.raises(ValueError):
         parse_handle(bad)
+
+
+def test_negative_message_id_is_rejected_before_any_script_runs(config, fake_runner):
+    svc, runner = service(config, fake_runner)
+    with pytest.raises(ValueError, match="negative"):
+        svc.read_message("gmail/INBOX#-1743")
+    assert runner.scripts == []
+
+
+def test_zero_message_id_is_still_accepted():
+    assert parse_handle("gmail/INBOX#0") == ("gmail", "INBOX", 0)
 
 
 # -- listing ---------------------------------------------------------------
@@ -152,6 +165,14 @@ def test_invalid_date_is_rejected(config, fake_runner):
     svc, _ = service(config, fake_runner, f"{US}0")
     with pytest.raises(ValueError, match="Invalid date"):
         svc.list_messages("gmail", "INBOX", since="last tuesday")
+
+
+@pytest.mark.parametrize("field", ["since", "before"])
+def test_empty_date_filter_is_rejected_before_a_script_runs(config, fake_runner, field):
+    svc, runner = service(config, fake_runner)
+    with pytest.raises(ValueError, match="Invalid date"):
+        svc.list_messages("gmail", "INBOX", **{field: ""})
+    assert runner.scripts == []
 
 
 def test_list_messages_denied_on_unlisted_mailbox(config, fake_runner):

@@ -411,6 +411,8 @@ def parse_handle(handle: str) -> tuple[str, str, int]:
         message_id = int(raw_id)
     except ValueError:
         raise ValueError(f"Handle '{handle}' has a non-numeric message id") from None
+    if message_id < 0:
+        raise ValueError(f"Handle '{handle}' has a negative message id")
     return account_key, mailbox, message_id
 
 
@@ -505,10 +507,10 @@ def _filter_clause(
         terms.append(f"sender contains {quote(from_contains)}")
     if subject_contains:
         terms.append(f"subject contains {quote(subject_contains)}")
-    if since:
+    if since is not None:
         setup += _date_var("sinceDate", since)
         terms.append("date received is greater than or equal to sinceDate")
-    if before:
+    if before is not None:
         setup += _date_var("beforeDate", before)
         terms.append("date received is less than beforeDate")
 

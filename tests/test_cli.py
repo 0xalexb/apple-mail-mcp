@@ -71,6 +71,11 @@ TOOL_FOR_VERB = {
 
 HANDLE = "gmail/INBOX#127614"
 NOT_RUNNING = "execution error: Application isn't running. (-600)"
+LIVE_NOT_FOUND = (
+    "816:853: execution error: Mail got an error: Can\u2019t get message 1 of mailbox "
+    '"[Gmail]/Starred" of account id "270E4F77-90E5-4BBC-B381-E21613D33A30" '
+    "whose id = -1743. Invalid index. (-1719)"
+)
 
 
 @pytest.fixture
@@ -459,13 +464,56 @@ class TestExitOne:
         assert (rc, out) == (1, "")
         assert "not in the allowlist" in err
 
-    def test_non_serializable_result_leaves_stdout_empty(self, svc, capsys):
+    def test_non_serializable_result_propagates_with_stdout_empty(self, svc, capsys):
         svc.list_mailboxes.return_value = {1, 2}
 
-        rc, out, err = _run(capsys, "mailboxes")
+        with pytest.raises(TypeError):
+            cli.main(["mailboxes"])
+
+        assert capsys.readouterr().out == ""
+
+    def test_type_error_from_the_service_is_not_swallowed(self, svc):
+        svc.read_message.side_effect = TypeError("bug")
+
+        with pytest.raises(TypeError, match="bug"):
+            cli.main(["read", "--handle", HANDLE])
+
+    def test_not_found_with_caller_data_in_it_is_1_not_2(self, config, capsys):
+        error = AppleScriptError(LIVE_NOT_FOUND)
+        with _with_runner(config, RaisingRunner(error)):
+            rc, out, err = _run(capsys, "read", "--handle", HANDLE)
 
         assert (rc, out) == (1, "")
-        assert err.startswith("apple-mail:")
+        assert "Invalid index" in err
+
+    def test_mailbox_name_holding_an_access_code_is_1_not_2(self, config, capsys):
+        error = AppleScriptError('Can\'t get mailbox "X-1743 (-1743)" of account "a". (-1728)')
+        with _with_runner(config, RaisingRunner(error)):
+            rc, out, err = _run(capsys, "messages", "--account", "gmail", "--mailbox", "INBOX")
+
+        assert (rc, out) == (1, "")
+        assert "(-1728)" in err
+
+    @pytest.mark.parametrize("flag", ["--since", "--before"])
+    def test_empty_date_flag_is_a_usage_error(self, config, capsys, flag):
+        runner = FakeRunner()
+        with _with_runner(config, runner):
+            rc, out, err = _run(
+                capsys, "messages", "--account", "gmail", "--mailbox", "INBOX", flag, ""
+            )
+
+        assert (rc, out) == (1, "")
+        assert "Invalid date" in err
+        assert runner.scripts == []
+
+    def test_negative_message_id_is_bad_input(self, config, capsys):
+        runner = FakeRunner()
+        with _with_runner(config, runner):
+            rc, out, err = _run(capsys, "read", "--handle", "gmail/INBOX#-1743")
+
+        assert (rc, out) == (1, "")
+        assert "negative message id" in err
+        assert runner.scripts == []
 
     def test_other_applescript_error(self, config, capsys):
         with _with_runner(config, RaisingRunner(AppleScriptError("syntax error (-2740)"))):
