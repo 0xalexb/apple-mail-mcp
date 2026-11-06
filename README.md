@@ -58,6 +58,50 @@ different things — the message was still in the source, or Mail reported no co
 the move is merely unconfirmed — and the result carries a `warning` saying which, instead of
 looking like success.
 
+## apple-mail CLI
+
+`apple-mail` runs the same service as the MCP tools, for callers that should not speak MCP.
+Each verb is the kebab-case form of one tool, its flags are that tool's parameters in
+kebab-case, and stdout is one JSON value equal to the tool's result.
+
+| Verb | Tool | Flags |
+|------|------|-------|
+| `mailboxes` | `list_mailboxes` | — |
+| `messages` | `list_messages` | `--account` `--mailbox` `--limit` `--offset` `--[no-]unread-only` `--[no-]flagged-only` `--from-contains` `--subject-contains` `--since` `--before` |
+| `read` | `read_message` | `--handle` `--[no-]mark-read` |
+| `mark-read`, `mark-unread` | `mark_read`, `mark_unread` | `--handle` |
+| `flag` | `set_flag` | `--handle` `--color` (omit or `none` unflags) |
+| `move` | `move_message` | `--handle` `--target-mailbox` `--target-account` |
+| `archive` | `archive_message` | `--handle` |
+| `flag-colors` | `flag_colors` | — |
+
+```bash
+apple-mail messages --account gmail --mailbox INBOX --unread-only
+apple-mail read --handle gmail/INBOX#127614 --mark-read
+```
+
+| Exit | Meaning |
+|------|---------|
+| `0` | ok; stdout is one JSON value, never empty |
+| `1` | usage error, not found, bad input, or refused by the allowlist config |
+| `2` | Mail not running or unreachable, Automation access denied, or timed out |
+
+On any error stdout is empty and stderr carries `apple-mail: …`. There is no delete verb and
+no file flag. The CLI reads the same allowlist config as the server; run through Deck, it
+resolves `~/.config/apple-mail-mcp/config.yml` from the owner's `HOME`, and the caller's
+`APPLE_MAIL_MCP_CONFIG` does not reach it. A terminal must be granted Automation access to
+Mail once.
+
+Install:
+
+```bash
+UV_TOOL_BIN_DIR=~/.local/share/uv/tool-bin uv tool install git+https://github.com/0xalexb/apple-mail-mcp
+```
+
+Without the variable `uv` uses `~/.local/bin`, and `dotfiles-sync` would enroll the binary
+into chezmoi. The same install also links `apple-mail-mcp`, so that directory must not sit
+ahead of the MCP server on `PATH`.
+
 ## Install
 
 ### Homebrew (recommended)
