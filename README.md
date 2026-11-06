@@ -83,8 +83,8 @@ apple-mail read --handle gmail/INBOX#127614 --mark-read
 | Exit | Meaning |
 |------|---------|
 | `0` | ok; stdout is one JSON value, never empty |
-| `1` | usage error, not found, bad input, or refused by the allowlist config |
-| `2` | Mail not running or unreachable, Automation access denied, or timed out |
+| `1` | usage error, not found, bad input (a negative message id, an empty `--since` or `--before`), or refused by the allowlist config |
+| `2` | Mail not running or unreachable, Automation access denied, or timed out; read from the code that ends Mail's error text, so caller data holding `-1743` does not count |
 
 On any error stdout is empty and stderr carries `apple-mail: …`. There is no delete verb and
 no file flag. The CLI reads the same allowlist config as the server; run through Deck, it
@@ -261,7 +261,7 @@ Tests fake the AppleScript runner, so the suite runs on any platform without tou
 
 Things that cost real time to discover, kept here so they are not rediscovered:
 
-- **Mail quits itself when idle.** Scripts fail with `-600` mid-session; the runner relaunches
+- **Mail quits itself when idle.** Scripts fail with a trailing `(-600)` mid-session; the runner relaunches
   Mail with `open -g -j` (background, hidden — never `activate`, which steals focus) and
   retries once.
 - **Never `repeat with m in (messages ... of mb)`.** That re-resolves the whole list

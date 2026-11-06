@@ -7,7 +7,7 @@ from importlib.metadata import version
 
 import yaml
 
-from apple_mail_mcp.applescript import AppleScriptError
+from apple_mail_mcp.applescript import AppleScriptError, error_code
 from apple_mail_mcp.config import load_config
 from apple_mail_mcp.mail_service import FLAG_COLORS, MailService
 
@@ -15,12 +15,7 @@ EXIT_OK = 0
 EXIT_BAD_INPUT = 1
 EXIT_NO_ACCESS = 2
 
-_ACCESS_MARKERS = (
-    "-600",
-    "-1743",
-    "-1712",
-    "Mail is not running and could not be launched",
-)
+_ACCESS_CODES = frozenset({"-600", "-1743", "-1712"})
 
 
 class _Parser(argparse.ArgumentParser):
@@ -125,7 +120,7 @@ def _run(args: argparse.Namespace) -> object:
 
 
 def _mail_unreachable(exc: AppleScriptError) -> bool:
-    return any(marker in str(exc) for marker in _ACCESS_MARKERS)
+    return error_code(exc) in _ACCESS_CODES
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -138,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     except AppleScriptError as exc:
         print(f"apple-mail: {exc}", file=sys.stderr)
         return EXIT_NO_ACCESS if _mail_unreachable(exc) else EXIT_BAD_INPUT
-    except (ValueError, RuntimeError, TypeError) as exc:
+    except (ValueError, RuntimeError) as exc:
         print(f"apple-mail: {exc}", file=sys.stderr)
         return EXIT_BAD_INPUT
     sys.stdout.write(text)

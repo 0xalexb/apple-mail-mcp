@@ -36,7 +36,8 @@ are separated from the domain ones. `applescript.py` is the seam tests fake.
 ## Error Handling
 
 - `ValueError` — invalid input, or a mailbox/capability outside the allowlist
-- `AppleScriptError` (a `RuntimeError`) — Mail rejected the script
+- `AppleScriptError` (a `RuntimeError`) — Mail rejected the script. Its `(-NNN)` code is read
+  only from the end of a line (`error_code`): caller data echoed mid-message never counts
 - `TimeoutError` — osascript exceeded `timeout_seconds`
 
 ## Deletion is out of scope
@@ -75,8 +76,8 @@ ones that will silently cost you: iterating `messages of mb` directly is 25x slo
 returns a list unless the left operand is text, and moving to `[Gmail]/All Mail` no-ops while
 reporting success.
 
-Nothing in `_move`'s script may abort after `move m to target`, or the runner's `-600` retry
-moves twice; see the comment above the script in `_move` for the shape that prevents it.
+Nothing in `_move`'s script may abort after `move m to target`, or the runner's retry on a trailing
+`(-600)` moves twice; see the comment above the script in `_move` for the shape that prevents it.
 
 ## Distribution
 

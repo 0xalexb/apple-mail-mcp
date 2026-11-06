@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import subprocess
 import time
 
@@ -9,13 +10,25 @@ RS = "\x1e"
 _MAIL_BUNDLE_ID = "com.apple.mail"
 
 # Mail terminates itself when idle, so any script may fail with -600 even though
-# the previous call moments earlier succeeded. Detected by code, not by message
-# text: the message is localized and uses a typographic apostrophe.
+# the previous call moments earlier succeeded. Detected by the trailing code, not
+# by message text: the message is localized and uses a typographic apostrophe, and
+# caller data echoed mid-message can hold "-600" too.
 _NOT_RUNNING = "-600"
+
+_TRAILING_CODE = re.compile(r"\((-\d+)\)\s*$", re.M)
 
 
 class AppleScriptError(RuntimeError):
     """osascript exited non-zero, or Mail rejected the script."""
+
+
+def error_code(exc: BaseException) -> str | None:
+    """The AppleScript error code that ends a line of the message, or None.
+
+    The last match wins, because stderr can carry XPC noise before the real error.
+    """
+    found = _TRAILING_CODE.findall(str(exc))[-1:]
+    return found[0] if found else None
 
 
 def quote(value: str) -> str:
@@ -34,7 +47,7 @@ class OsascriptRunner:
         try:
             return self._exec(script)
         except AppleScriptError as err:
-            if _NOT_RUNNING not in str(err):
+            if error_code(err) != _NOT_RUNNING:
                 raise
         self._ensure_running()
         return self._exec(script)
@@ -74,6 +87,6 @@ class OsascriptRunner:
             except AppleScriptError:
                 if time.monotonic() >= deadline:
                     raise AppleScriptError(
-                        "Mail is not running and could not be launched"
+                        f"Mail is not running and could not be launched ({_NOT_RUNNING})"
                     ) from None
                 time.sleep(0.5)

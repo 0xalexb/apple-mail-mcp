@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from apple_mail_mcp.applescript import AppleScriptError, OsascriptRunner, quote
+from apple_mail_mcp.applescript import AppleScriptError, OsascriptRunner, error_code, quote
 
 
 def completed(returncode=0, stdout="", stderr=""):
@@ -85,5 +85,37 @@ def test_other_errors_do_not_retry():
 def test_launch_failure_is_reported():
     not_running = completed(returncode=1, stderr="(-600)")
     with patch("subprocess.run", return_value=not_running):
-        with pytest.raises(AppleScriptError, match="could not be launched"):
+        with pytest.raises(AppleScriptError, match=r"could not be launched \(-600\)"):
             OsascriptRunner(launch_wait=0)("script")
+
+
+def test_caller_data_holding_not_running_code_does_not_relaunch():
+    failed = completed(
+        returncode=1,
+        stderr='execution error: Can\'t get mailbox "X (-600)" of account "a". (-1728)',
+    )
+    with patch("subprocess.run", return_value=failed) as run:
+        with pytest.raises(AppleScriptError):
+            OsascriptRunner()("script")
+    assert run.call_count == 1
+
+
+LIVE_NOT_FOUND = (
+    "816:853: execution error: Mail got an error: Can\u2019t get message 1 of mailbox "
+    '"[Gmail]/Starred" of account id "270E4F77-90E5-4BBC-B381-E21613D33A30" '
+    "whose id = -1743. Invalid index. (-1719)"
+)
+
+
+@pytest.mark.parametrize(
+    "message,expected",
+    [
+        (LIVE_NOT_FOUND, "-1719"),
+        ('Can\'t get mailbox "X-1743 (-1743)" of account "a". (-1728)', "-1728"),
+        ("Connection Invalid (-609)\nexecution error: nope (-1728)", "-1728"),
+        ("execution error: no code here", None),
+        ("(-600) trailing text", None),
+    ],
+)
+def test_error_code_reads_only_the_trailing_code(message, expected):
+    assert error_code(AppleScriptError(message)) == expected
