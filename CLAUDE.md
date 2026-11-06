@@ -7,6 +7,7 @@ uv sync                          # Install deps
 uv run pytest                    # Run tests
 uv run ruff check src/ tests/    # Lint
 uv run apple-mail-mcp            # Run server
+uv run apple-mail mailboxes      # Run the CLI
 ```
 
 ## Architecture
@@ -14,6 +15,8 @@ uv run apple-mail-mcp            # Run server
 - **`server.py`** — MCPServer tool definitions, lazy service init
 - **`mail_service.py`** — domain operations; every AppleScript template lives here
 - **`applescript.py`** — osascript subprocess, relaunch/retry, quoting, US/RS framing
+- **`cli.py`** — `apple-mail` console script; one verb per tool, calls `MailService` directly
+  and never imports `server.py`; exit `0` ok, `1` bad input, `2` Mail unreachable or denied
 - **`config.py`** — YAML allowlist; deny-by-default permission resolution
 
 Three layers, not two: unlike EventKit there is no object model, so the subprocess concerns
